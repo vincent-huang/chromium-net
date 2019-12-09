@@ -48,6 +48,19 @@ const char kHelloPath[] = "/hello.txt";
 const char kHelloBodyValue[] = "Hello from QUIC Server";
 const int kHelloStatus = 200;
 
+// Used as a simple pushed response from the server.
+const char kKittenPath[] = "/kitten-1.jpg";
+const char kKittenBodyValue[] = "Kitten image";
+
+// Used as a simple pushed response from the server.
+const char kFaviconPath[] = "/favicon.ico";
+const char kFaviconBodyValue[] = "Favion";
+
+// Used as a simple pushed response from the server.
+const char kIndexPath[] = "/index2.html";
+const char kIndexBodyValue[] = "Hello from QUIC Server";
+const int kIndexStatus = 200;
+
 class URLRequestQuicTest : public TestWithTaskEnvironment {
  protected:
   URLRequestQuicTest() : context_(new TestURLRequestContext(true)) {
@@ -134,14 +147,32 @@ class URLRequestQuicTest : public TestWithTaskEnvironment {
   }
 
  protected:
+  // Returns a fully-qualified URL for |path| on the test server.
+  std::string UrlFromPath(base::StringPiece path) {
+    return std::string("https://") + std::string(kTestServerHost) +
+           std::string(path);
+  }
+
   RecordingTestNetLog net_log_;
 
  private:
   void StartQuicServer() {
     // Set up in-memory cache.
+
+    // Add the simply hello response.
     memory_cache_backend_.AddSimpleResponse(kTestServerHost, kHelloPath,
                                             kHelloStatus, kHelloBodyValue);
-    memory_cache_backend_.InitializeBackend(ServerPushCacheDirectory());
+
+    // Now set up index so that it pushes kitten and favicon.
+    quic::QuicBackendResponse::ServerPushInfo push_info1(
+        quic::QuicUrl(UrlFromPath(kKittenPath)), spdy::SpdyHeaderBlock(),
+        spdy::kV3LowestPriority, kKittenBodyValue);
+    quic::QuicBackendResponse::ServerPushInfo push_info2(
+        quic::QuicUrl(UrlFromPath(kFaviconPath)), spdy::SpdyHeaderBlock(),
+        spdy::kV3LowestPriority, kFaviconBodyValue);
+    memory_cache_backend_.AddSimpleResponseWithServerPushResources(
+        kTestServerHost, kIndexPath, kIndexStatus, kIndexBodyValue,
+        {push_info1, push_info2});
     quic::QuicConfig config;
     // Set up server certs.
     std::unique_ptr<net::ProofSourceChromium> proof_source(
@@ -258,10 +289,8 @@ class WaitForCompletionNetworkDelegate : public net::TestNetworkDelegate {
 TEST_F(URLRequestQuicTest, TestGetRequest) {
   Init();
   CheckLoadTimingDelegate delegate(false);
-  std::string url =
-      base::StringPrintf("https://%s%s", kTestServerHost, kHelloPath);
   std::unique_ptr<URLRequest> request =
-      CreateRequest(GURL(url), DEFAULT_PRIORITY, &delegate);
+      CreateRequest(GURL(UrlFromPath(kHelloPath)), DEFAULT_PRIORITY, &delegate);
 
   request->Start();
   ASSERT_TRUE(request->is_pending());
@@ -290,10 +319,8 @@ TEST_F(URLRequestQuicTest, CancelPushIfCached_SomeCached) {
   // Send a request to the pushed url: /kitten-1.jpg to pull the resource into
   // cache.
   CheckLoadTimingDelegate delegate_0(false);
-  std::string url_0 =
-      base::StringPrintf("https://%s%s", kTestServerHost, "/kitten-1.jpg");
-  std::unique_ptr<URLRequest> request_0 =
-      CreateRequest(GURL(url_0), DEFAULT_PRIORITY, &delegate_0);
+  std::unique_ptr<URLRequest> request_0 = CreateRequest(
+      GURL(UrlFromPath(kKittenPath)), DEFAULT_PRIORITY, &delegate_0);
 
   request_0->set_network_isolation_key(kTestNetworkIsolationKey);
   request_0->Start();
@@ -309,10 +336,8 @@ TEST_F(URLRequestQuicTest, CancelPushIfCached_SomeCached) {
   // Send a request to /index2.html which pushes /kitten-1.jpg and /favicon.ico.
   // Should cancel push for /kitten-1.jpg.
   CheckLoadTimingDelegate delegate(true);
-  std::string url =
-      base::StringPrintf("https://%s%s", kTestServerHost, "/index2.html");
   std::unique_ptr<URLRequest> request =
-      CreateRequest(GURL(url), DEFAULT_PRIORITY, &delegate);
+      CreateRequest(GURL(UrlFromPath(kIndexPath)), DEFAULT_PRIORITY, &delegate);
 
   request->set_network_isolation_key(kTestNetworkIsolationKey);
   request->Start();
@@ -332,10 +357,8 @@ TEST_F(URLRequestQuicTest, CancelPushIfCached_SomeCached) {
   ASSERT_EQ(4u, entries.size());
 
   std::string value;
-  std::string push_url_1 =
-      base::StringPrintf("https://%s%s", kTestServerHost, "/kitten-1.jpg");
-  std::string push_url_2 =
-      base::StringPrintf("https://%s%s", kTestServerHost, "/favicon.ico");
+  std::string push_url_1 = UrlFromPath(kKittenPath);
+  std::string push_url_2 = UrlFromPath(kFaviconPath);
 
   const NetLogSource source_1 = FindPushUrlSource(entries, push_url_1);
   EXPECT_TRUE(source_1.IsValid());
@@ -378,10 +401,8 @@ TEST_F(URLRequestQuicTest, CancelPushIfCached_AllCached) {
   // Send a request to the pushed url: /kitten-1.jpg to pull the resource into
   // cache.
   CheckLoadTimingDelegate delegate_0(false);
-  std::string url_0 =
-      base::StringPrintf("https://%s%s", kTestServerHost, "/kitten-1.jpg");
-  std::unique_ptr<URLRequest> request_0 =
-      CreateRequest(GURL(url_0), DEFAULT_PRIORITY, &delegate_0);
+  std::unique_ptr<URLRequest> request_0 = CreateRequest(
+      GURL(UrlFromPath(kKittenPath)), DEFAULT_PRIORITY, &delegate_0);
 
   request_0->set_network_isolation_key(kTestNetworkIsolationKey);
   request_0->Start();
@@ -397,10 +418,8 @@ TEST_F(URLRequestQuicTest, CancelPushIfCached_AllCached) {
   // Send a request to the pushed url: /favicon.ico to pull the resource into
   // cache.
   CheckLoadTimingDelegate delegate_1(true);
-  std::string url_1 =
-      base::StringPrintf("https://%s%s", kTestServerHost, "/favicon.ico");
-  std::unique_ptr<URLRequest> request_1 =
-      CreateRequest(GURL(url_1), DEFAULT_PRIORITY, &delegate_1);
+  std::unique_ptr<URLRequest> request_1 = CreateRequest(
+      GURL(UrlFromPath(kFaviconPath)), DEFAULT_PRIORITY, &delegate_1);
 
   request_1->set_network_isolation_key(kTestNetworkIsolationKey);
   request_1->Start();
@@ -416,10 +435,8 @@ TEST_F(URLRequestQuicTest, CancelPushIfCached_AllCached) {
   // Send a request to /index2.html which pushes /kitten-1.jpg and /favicon.ico.
   // Should cancel push for both pushed resources, since they're already cached.
   CheckLoadTimingDelegate delegate(true);
-  std::string url =
-      base::StringPrintf("https://%s%s", kTestServerHost, "/index2.html");
   std::unique_ptr<URLRequest> request =
-      CreateRequest(GURL(url), DEFAULT_PRIORITY, &delegate);
+      CreateRequest(GURL(UrlFromPath(kIndexPath)), DEFAULT_PRIORITY, &delegate);
 
   request->set_network_isolation_key(kTestNetworkIsolationKey);
   request->Start();
@@ -439,10 +456,8 @@ TEST_F(URLRequestQuicTest, CancelPushIfCached_AllCached) {
   EXPECT_EQ(4u, entries.size());
 
   std::string value;
-  std::string push_url_1 =
-      base::StringPrintf("https://%s%s", kTestServerHost, "/kitten-1.jpg");
-  std::string push_url_2 =
-      base::StringPrintf("https://%s%s", kTestServerHost, "/favicon.ico");
+  std::string push_url_1 = UrlFromPath(kKittenPath);
+  std::string push_url_2 = UrlFromPath(kFaviconPath);
 
   const NetLogSource source_1 = FindPushUrlSource(entries, push_url_1);
   EXPECT_TRUE(source_1.IsValid());
@@ -468,11 +483,10 @@ TEST_F(URLRequestQuicTest, CancelPushIfCached_AllCached) {
 TEST_F(URLRequestQuicTest, DoNotCancelPushIfNotFoundInCache) {
   Init();
 
-  // Send a request to /index2.hmtl which pushes /kitten-1.jpg and /favicon.ico
+  // Send a request to /index2.html which pushes /kitten-1.jpg and /favicon.ico
   // and shouldn't cancel any since neither is in cache.
   CheckLoadTimingDelegate delegate(false);
-  std::string url =
-      base::StringPrintf("https://%s%s", kTestServerHost, "/index2.html");
+  std::string url = UrlFromPath(kIndexPath);
   std::unique_ptr<URLRequest> request =
       CreateRequest(GURL(url), DEFAULT_PRIORITY, &delegate);
 
@@ -492,10 +506,8 @@ TEST_F(URLRequestQuicTest, DoNotCancelPushIfNotFoundInCache) {
   EXPECT_EQ(4u, entries.size());
 
   std::string value;
-  std::string push_url_1 =
-      base::StringPrintf("https://%s%s", kTestServerHost, "/kitten-1.jpg");
-  std::string push_url_2 =
-      base::StringPrintf("https://%s%s", kTestServerHost, "/favicon.ico");
+  std::string push_url_1 = UrlFromPath(kKittenPath);
+  std::string push_url_2 = UrlFromPath(kFaviconPath);
 
   const NetLogSource source_1 = FindPushUrlSource(entries, push_url_1);
   EXPECT_TRUE(source_1.IsValid());
@@ -524,15 +536,13 @@ TEST_F(URLRequestQuicTest, TestTwoRequests) {
   Init();
   CheckLoadTimingDelegate delegate(false);
   delegate.set_on_complete(base::DoNothing());
-  std::string url =
-      base::StringPrintf("https://%s%s", kTestServerHost, kHelloPath);
   std::unique_ptr<URLRequest> request =
-      CreateRequest(GURL(url), DEFAULT_PRIORITY, &delegate);
+      CreateRequest(GURL(UrlFromPath(kHelloPath)), DEFAULT_PRIORITY, &delegate);
 
   CheckLoadTimingDelegate delegate2(true);
   delegate2.set_on_complete(base::DoNothing());
-  std::unique_ptr<URLRequest> request2 =
-      CreateRequest(GURL(url), DEFAULT_PRIORITY, &delegate2);
+  std::unique_ptr<URLRequest> request2 = CreateRequest(
+      GURL(UrlFromPath(kHelloPath)), DEFAULT_PRIORITY, &delegate2);
   request->Start();
   request2->Start();
   ASSERT_TRUE(request->is_pending());
@@ -553,10 +563,8 @@ TEST_F(URLRequestQuicTest, RequestHeadersCallback) {
   HttpRequestHeaders extra_headers;
   extra_headers.SetHeader("X-Foo", "bar");
 
-  std::string url =
-      base::StringPrintf("https://%s%s", kTestServerHost, kHelloPath);
   std::unique_ptr<URLRequest> request =
-      CreateRequest(GURL(url), DEFAULT_PRIORITY, &delegate);
+      CreateRequest(GURL(UrlFromPath(kHelloPath)), DEFAULT_PRIORITY, &delegate);
 
   request->SetExtraRequestHeaders(extra_headers);
   request->SetRequestHeadersCallback(base::Bind(
