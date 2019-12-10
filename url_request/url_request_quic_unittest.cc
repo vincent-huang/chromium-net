@@ -10,6 +10,7 @@
 #include "base/run_loop.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/stringprintf.h"
+#include "build/build_config.h"
 #include "net/base/features.h"
 #include "net/base/load_timing_info.h"
 #include "net/base/network_delegate.h"
@@ -61,10 +62,13 @@ const char kIndexPath[] = "/index2.html";
 const char kIndexBodyValue[] = "Hello from QUIC Server";
 const int kIndexStatus = 200;
 
-class URLRequestQuicTest : public TestWithTaskEnvironment {
+class URLRequestQuicTest
+    : public TestWithTaskEnvironment,
+      public ::testing::WithParamInterface<quic::ParsedQuicVersion> {
  protected:
   URLRequestQuicTest() : context_(new TestURLRequestContext(true)) {
-    StartQuicServer();
+    QuicEnableVersion(version());
+    StartQuicServer(version());
 
     std::unique_ptr<HttpNetworkSession::Params> params(
         new HttpNetworkSession::Params);
@@ -77,6 +81,7 @@ class URLRequestQuicTest : public TestWithTaskEnvironment {
     // To simplify the test, and avoid the race with the HTTP request, we force
     // QUIC for these requests.
     context_->set_quic_context(&quic_context_);
+    quic_context_.params()->supported_versions = {version()};
     quic_context_.params()->origins_to_force_quic_on.insert(
         HostPortPair(kTestServerHost, 443));
     params->enable_quic = true;
@@ -146,6 +151,8 @@ class URLRequestQuicTest : public TestWithTaskEnvironment {
     return nullptr;
   }
 
+  quic::ParsedQuicVersion version() { return GetParam(); }
+
  protected:
   // Returns a fully-qualified URL for |path| on the test server.
   std::string UrlFromPath(base::StringPiece path) {
@@ -156,7 +163,7 @@ class URLRequestQuicTest : public TestWithTaskEnvironment {
   RecordingTestNetLog net_log_;
 
  private:
-  void StartQuicServer() {
+  void StartQuicServer(quic::ParsedQuicVersion version) {
     // Set up in-memory cache.
 
     // Add the simply hello response.
@@ -184,8 +191,8 @@ class URLRequestQuicTest : public TestWithTaskEnvironment {
         base::FilePath()));
     server_.reset(new QuicSimpleServer(
         quic::test::crypto_test_utils::ProofSourceForTesting(), config,
-        quic::QuicCryptoServerConfig::ConfigOptions(),
-        quic::AllSupportedVersions(), &memory_cache_backend_));
+        quic::QuicCryptoServerConfig::ConfigOptions(), {version},
+        &memory_cache_backend_));
     int rv =
         server_->Listen(net::IPEndPoint(net::IPAddress::IPv4AllZeros(), 0));
     EXPECT_GE(rv, 0) << "Quic server fails to start";
@@ -216,6 +223,7 @@ class URLRequestQuicTest : public TestWithTaskEnvironment {
   QuicContext quic_context_;
   quic::QuicMemoryCacheBackend memory_cache_backend_;
   MockCertVerifier cert_verifier_;
+  QuicFlagSaver flags_;  // Save/restore all QUIC flag values.
 };
 
 // A URLRequest::Delegate that checks LoadTimingInfo when response headers are
@@ -286,7 +294,23 @@ class WaitForCompletionNetworkDelegate : public net::TestNetworkDelegate {
 
 }  // namespace
 
-TEST_F(URLRequestQuicTest, TestGetRequest) {
+// Used by ::testing::PrintToStringParamName().
+std::string PrintToString(const quic::ParsedQuicVersion& v) {
+  return quic::ParsedQuicVersionToString(v);
+}
+
+INSTANTIATE_TEST_SUITE_P(Version,
+                         URLRequestQuicTest,
+                         ::testing::ValuesIn(quic::AllSupportedVersions()),
+                         ::testing::PrintToStringParamName());
+
+TEST_P(URLRequestQuicTest, TestGetRequest) {
+  if (version().handshake_protocol == quic::PROTOCOL_TLS1_3) {
+    // TODO(crbug.com/1032263): Make this work with TLS.
+    Init();
+    return;
+  }
+
   Init();
   CheckLoadTimingDelegate delegate(false);
   std::unique_ptr<URLRequest> request =
@@ -295,12 +319,23 @@ TEST_F(URLRequestQuicTest, TestGetRequest) {
   request->Start();
   ASSERT_TRUE(request->is_pending());
   delegate.RunUntilComplete();
-
   EXPECT_TRUE(request->status().is_success());
   EXPECT_EQ(kHelloBodyValue, delegate.data_received());
+  EXPECT_TRUE(request->ssl_info().is_valid());
 }
 
-TEST_F(URLRequestQuicTest, CancelPushIfCached_SomeCached) {
+TEST_P(URLRequestQuicTest, CancelPushIfCached_SomeCached) {
+  if (version().handshake_protocol == quic::PROTOCOL_TLS1_3) {
+    // TODO(crbug.com/1032263): Make this work with TLS.
+    Init();
+    return;
+  }
+
+  if (VersionUsesHttp3(version().transport_version)) {
+    Init();
+    return;
+  }
+
   // Skip test if "split cache" is enabled while "partition connections" is
   // disabled, as it breaks push.
   if (base::FeatureList::IsEnabled(
@@ -378,11 +413,25 @@ TEST_F(URLRequestQuicTest, CancelPushIfCached_SomeCached) {
   EXPECT_TRUE(end_entry_2->HasParams());
   EXPECT_EQ(-400, GetNetErrorCodeFromParams(*end_entry_2));
 
+#if !defined(OS_FUCHSIA)
+  // TODO(crbug.com/813631): Make this work on Fuchsia.
   // Verify the reset error count received on the server side.
   EXPECT_LE(1u, GetRstErrorCountReceivedByServer(quic::QUIC_STREAM_CANCELLED));
+#endif
 }
 
-TEST_F(URLRequestQuicTest, CancelPushIfCached_AllCached) {
+TEST_P(URLRequestQuicTest, CancelPushIfCached_AllCached) {
+  if (version().handshake_protocol == quic::PROTOCOL_TLS1_3) {
+    // TODO(crbug.com/1032263): Make this work with TLS.
+    Init();
+    return;
+  }
+
+  if (VersionUsesHttp3(version().transport_version)) {
+    Init();
+    return;
+  }
+
   // Skip test if "split cache" is enabled while "partition connections" is
   // disabled, as it breaks push.
   if (base::FeatureList::IsEnabled(
@@ -476,14 +525,28 @@ TEST_F(URLRequestQuicTest, CancelPushIfCached_AllCached) {
   EXPECT_FALSE(end_entry_2->HasParams());
   EXPECT_FALSE(GetOptionalNetErrorCodeFromParams(*end_entry_2));
 
+#if !defined(OS_FUCHSIA)
+  // TODO(crbug.com/813631): Make this work on Fuchsia.
   // Verify the reset error count received on the server side.
   EXPECT_LE(2u, GetRstErrorCountReceivedByServer(quic::QUIC_STREAM_CANCELLED));
+#endif
 }
 
-TEST_F(URLRequestQuicTest, DoNotCancelPushIfNotFoundInCache) {
+TEST_P(URLRequestQuicTest, DoNotCancelPushIfNotFoundInCache) {
+  if (version().handshake_protocol == quic::PROTOCOL_TLS1_3) {
+    // TODO(crbug.com/1032263): Make this work with TLS.
+    Init();
+    return;
+  }
+
+  if (VersionUsesHttp3(version().transport_version)) {
+    Init();
+    return;
+  }
+
   Init();
 
-  // Send a request to /index2.html which pushes /kitten-1.jpg and /favicon.ico
+  // Send a request to /index2.hmtl which pushes /kitten-1.jpg and /favicon.ico
   // and shouldn't cancel any since neither is in cache.
   CheckLoadTimingDelegate delegate(false);
   std::string url = UrlFromPath(kIndexPath);
@@ -528,7 +591,13 @@ TEST_F(URLRequestQuicTest, DoNotCancelPushIfNotFoundInCache) {
 
 // Tests that if two requests use the same QUIC session, the second request
 // should not have |LoadTimingInfo::connect_timing|.
-TEST_F(URLRequestQuicTest, TestTwoRequests) {
+TEST_P(URLRequestQuicTest, TestTwoRequests) {
+  if (version().handshake_protocol == quic::PROTOCOL_TLS1_3) {
+    // TODO(crbug.com/1032263): Make this work with TLS.
+    Init();
+    return;
+  }
+
   base::RunLoop run_loop;
   WaitForCompletionNetworkDelegate network_delegate(
       run_loop.QuitClosure(), /*num_expected_requests=*/2);
@@ -555,7 +624,13 @@ TEST_F(URLRequestQuicTest, TestTwoRequests) {
   EXPECT_EQ(kHelloBodyValue, delegate2.data_received());
 }
 
-TEST_F(URLRequestQuicTest, RequestHeadersCallback) {
+TEST_P(URLRequestQuicTest, RequestHeadersCallback) {
+  if (version().handshake_protocol == quic::PROTOCOL_TLS1_3) {
+    // TODO(crbug.com/1032263): Make this work with TLS.
+    Init();
+    return;
+  }
+
   Init();
   HttpRawRequestHeaders raw_headers;
   TestDelegate delegate;
