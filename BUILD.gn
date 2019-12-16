@@ -2923,8 +2923,6 @@ static_library("test_support") {
       "test/url_request/url_request_mock_http_job.h",
       "test/url_request/url_request_test_job_backed_by_file.cc",
       "test/url_request/url_request_test_job_backed_by_file.h",
-      "url_request/test_url_request_interceptor.cc",
-      "url_request/test_url_request_interceptor.h",
     ]
   }
 
