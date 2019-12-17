@@ -2507,6 +2507,7 @@ bundle_data("test_support_bundle_data") {
     "data/ssl/certificates/825_days_1_second_after_2018_03_01.pem",
     "data/ssl/certificates/825_days_after_2018_03_01.pem",
     "data/ssl/certificates/826_days_after_2018_03_01.pem",
+    "data/ssl/certificates/900_days_after_2019_07_01.pem",
     "data/ssl/certificates/BUILD.gn",
     "data/ssl/certificates/README",
     "data/ssl/certificates/aia-cert.pem",
