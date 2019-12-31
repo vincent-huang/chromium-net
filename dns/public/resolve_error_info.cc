@@ -8,10 +8,8 @@ namespace net {
 
 ResolveErrorInfo::ResolveErrorInfo() {}
 
-ResolveErrorInfo::ResolveErrorInfo(int resolve_error,
-                                   bool is_secure_network_error)
-    : error(resolve_error), is_secure_network_error(is_secure_network_error) {
-  DCHECK(!(is_secure_network_error && resolve_error == net::OK));
+ResolveErrorInfo::ResolveErrorInfo(int resolve_error) {
+  error = resolve_error;
 }
 
 ResolveErrorInfo::ResolveErrorInfo(const ResolveErrorInfo& resolve_error_info) =
@@ -26,8 +24,7 @@ ResolveErrorInfo& ResolveErrorInfo::operator=(ResolveErrorInfo&& other) =
     default;
 
 bool ResolveErrorInfo::operator==(const ResolveErrorInfo& other) const {
-  return error == other.error &&
-         is_secure_network_error == other.is_secure_network_error;
+  return error == other.error;
 }
 
 bool ResolveErrorInfo::operator!=(const ResolveErrorInfo& other) const {

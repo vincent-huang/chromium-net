@@ -287,37 +287,5 @@ TEST_F(HttpWithDnsOverHttpsTest, EndToEnd) {
   EXPECT_EQ(d.data_received(), kTestBody);
 }
 
-TEST_F(HttpWithDnsOverHttpsTest, EndToEndFail) {
-  // Shutdown the DoH server so that all DoH requests are refused.
-  EXPECT_TRUE(doh_server_.ShutdownAndWaitUntilComplete());
-
-  // Make a request that will trigger a DoH query.
-  TestDelegate d;
-  GURL main_url = test_server_.GetURL("fail.example.com", "/test");
-  std::unique_ptr<URLRequest> req(context()->CreateRequest(
-      main_url, DEFAULT_PRIORITY, &d, TRAFFIC_ANNOTATION_FOR_TESTS));
-  req->Start();
-  base::RunLoop().Run();
-  EXPECT_TRUE(test_server_.ShutdownAndWaitUntilComplete());
-
-  // The two DoH lookups for "fail.example.com" (both A and AAAA
-  // records are queried) should both have failed to reach the DoH server
-  // since it was not running.
-  EXPECT_EQ(doh_queries_served_, 0u);
-  // The requests to the DoH server are pooled, so there should only be one
-  // insecure lookup for the DoH server hostname.
-  EXPECT_EQ(host_resolver_proc_->insecure_queries_served(), 1u);
-  // No HTTPS connection to the test server will be attempted due to the
-  // host resolution error.
-  EXPECT_EQ(test_https_requests_served_, 0u);
-
-  EXPECT_TRUE(d.response_completed());
-  EXPECT_EQ(d.request_status(), net::ERR_CONNECTION_REFUSED);
-
-  const auto& resolve_error_info = req->response_info().resolve_error_info;
-  EXPECT_TRUE(resolve_error_info.is_secure_network_error);
-  EXPECT_EQ(resolve_error_info.error, net::ERR_CONNECTION_REFUSED);
-}
-
 }  // namespace
 }  // namespace net

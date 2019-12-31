@@ -5300,8 +5300,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Automatic) {
       HostPortPair("automatic", 80), NetworkIsolationKey(), NetLogWithSource(),
       base::nullopt, request_context_.get(), host_cache_.get()));
   ASSERT_THAT(response_secure.result_error(), IsOk());
-  EXPECT_FALSE(
-      response_secure.request()->GetResolveErrorInfo().is_secure_network_error);
   EXPECT_THAT(
       response_secure.request()->GetAddressResults().value().endpoints(),
       testing::UnorderedElementsAre(CreateExpected("127.0.0.1", 80),
@@ -5320,9 +5318,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Automatic) {
       NetLogWithSource(), base::nullopt, request_context_.get(),
       host_cache_.get()));
   ASSERT_THAT(response_insecure.result_error(), IsOk());
-  EXPECT_FALSE(response_insecure.request()
-                   ->GetResolveErrorInfo()
-                   .is_secure_network_error);
   EXPECT_THAT(
       response_insecure.request()->GetAddressResults().value().endpoints(),
       testing::UnorderedElementsAre(CreateExpected("127.0.0.1", 80),
@@ -5365,9 +5360,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Automatic_SecureCache) {
       NetLogWithSource(), base::nullopt, request_context_.get(),
       host_cache_.get()));
   EXPECT_THAT(response_secure_cached.result_error(), IsOk());
-  EXPECT_FALSE(response_secure_cached.request()
-                   ->GetResolveErrorInfo()
-                   .is_secure_network_error);
   EXPECT_THAT(
       response_secure_cached.request()->GetAddressResults().value().endpoints(),
       testing::ElementsAre(kExpectedSecureIP));
@@ -5395,9 +5387,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Automatic_InsecureCache) {
       NetLogWithSource(), base::nullopt, request_context_.get(),
       host_cache_.get()));
   EXPECT_THAT(response_insecure_cached.result_error(), IsOk());
-  EXPECT_FALSE(response_insecure_cached.request()
-                   ->GetResolveErrorInfo()
-                   .is_secure_network_error);
   EXPECT_THAT(response_insecure_cached.request()
                   ->GetAddressResults()
                   .value()
@@ -5484,9 +5473,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Automatic_Unavailable) {
       HostPortPair("automatic", 80), NetworkIsolationKey(), NetLogWithSource(),
       base::nullopt, request_context_.get(), host_cache_.get()));
   ASSERT_THAT(response_automatic.result_error(), IsOk());
-  EXPECT_FALSE(response_automatic.request()
-                   ->GetResolveErrorInfo()
-                   .is_secure_network_error);
   EXPECT_THAT(
       response_automatic.request()->GetAddressResults().value().endpoints(),
       testing::UnorderedElementsAre(CreateExpected("127.0.0.1", 80),
@@ -5519,8 +5505,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Automatic_Unavailable_Fail) {
       HostPortPair("secure", 80), NetworkIsolationKey(), NetLogWithSource(),
       base::nullopt, request_context_.get(), host_cache_.get()));
   ASSERT_THAT(response_secure.result_error(), IsError(ERR_NAME_NOT_RESOLVED));
-  EXPECT_FALSE(
-      response_secure.request()->GetResolveErrorInfo().is_secure_network_error);
 
   HostCache::Key secure_key = HostCache::Key(
       "secure", DnsQueryType::UNSPECIFIED, 0 /* host_resolver_flags */,
@@ -5562,8 +5546,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Automatic_Stale) {
       NetLogWithSource(), stale_allowed_parameters, request_context_.get(),
       host_cache_.get()));
   EXPECT_THAT(response_stale.result_error(), IsOk());
-  EXPECT_FALSE(
-      response_stale.request()->GetResolveErrorInfo().is_secure_network_error);
   EXPECT_THAT(response_stale.request()->GetAddressResults().value().endpoints(),
               testing::ElementsAre(kExpectedStaleIP));
   EXPECT_TRUE(response_stale.request()->GetStaleInfo()->is_stale());
@@ -5670,9 +5652,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Automatic_DotActive) {
       host_cache_.get()));
   proc_->SignalMultiple(1u);
   ASSERT_THAT(response_insecure.result_error(), IsOk());
-  EXPECT_FALSE(response_insecure.request()
-                   ->GetResolveErrorInfo()
-                   .is_secure_network_error);
   EXPECT_THAT(
       response_insecure.request()->GetAddressResults().value().endpoints(),
       testing::ElementsAre(CreateExpected("192.168.1.100", 80)));
@@ -5696,9 +5675,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Automatic_DotActive) {
       NetLogWithSource(), base::nullopt, request_context_.get(),
       host_cache_.get()));
   EXPECT_THAT(response_insecure_cached.result_error(), IsOk());
-  EXPECT_FALSE(response_insecure_cached.request()
-                   ->GetResolveErrorInfo()
-                   .is_secure_network_error);
   EXPECT_THAT(response_insecure_cached.request()
                   ->GetAddressResults()
                   .value()
@@ -5720,8 +5696,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Secure) {
       HostPortPair("secure", 80), NetworkIsolationKey(), NetLogWithSource(),
       base::nullopt, request_context_.get(), host_cache_.get()));
   ASSERT_THAT(response_secure.result_error(), IsOk());
-  EXPECT_FALSE(
-      response_secure.request()->GetResolveErrorInfo().is_secure_network_error);
   HostCache::Key secure_key = HostCache::Key(
       "secure", DnsQueryType::UNSPECIFIED, 0 /* host_resolver_flags */,
       HostResolverSource::ANY, NetworkIsolationKey());
@@ -5733,9 +5707,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Secure) {
       HostPortPair("ok", 80), NetworkIsolationKey(), NetLogWithSource(),
       base::nullopt, request_context_.get(), host_cache_.get()));
   ASSERT_THAT(response_insecure.result_error(), IsError(ERR_NAME_NOT_RESOLVED));
-  EXPECT_TRUE(response_insecure.request()
-                  ->GetResolveErrorInfo()
-                  .is_secure_network_error);
   HostCache::Key insecure_key = HostCache::Key(
       "ok", DnsQueryType::UNSPECIFIED, 0 /* host_resolver_flags */,
       HostResolverSource::ANY, NetworkIsolationKey());
@@ -5748,8 +5719,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Secure) {
       base::nullopt, request_context_.get(), host_cache_.get()));
   proc_->SignalMultiple(1u);
   EXPECT_THAT(response_proc.result_error(), IsError(ERR_NAME_NOT_RESOLVED));
-  EXPECT_TRUE(
-      response_proc.request()->GetResolveErrorInfo().is_secure_network_error);
 }
 
 TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Secure_InsecureAsyncDisabled) {
@@ -5799,9 +5768,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Secure_Local_CacheMiss) {
       source_none_parameters, request_context_.get(), host_cache_.get()));
   EXPECT_TRUE(cache_miss_request.complete());
   EXPECT_THAT(cache_miss_request.result_error(), IsError(ERR_DNS_CACHE_MISS));
-  EXPECT_FALSE(cache_miss_request.request()
-                   ->GetResolveErrorInfo()
-                   .is_secure_network_error);
   EXPECT_FALSE(cache_miss_request.request()->GetAddressResults());
   EXPECT_FALSE(cache_miss_request.request()->GetStaleInfo());
 }
@@ -5830,8 +5796,6 @@ TEST_F(HostResolverManagerDnsTest, SecureDnsMode_Secure_Local_CacheHit) {
       base::nullopt, request_context_.get(), host_cache_.get()));
   EXPECT_TRUE(response_cached.complete());
   EXPECT_THAT(response_cached.result_error(), IsOk());
-  EXPECT_FALSE(
-      response_cached.request()->GetResolveErrorInfo().is_secure_network_error);
   EXPECT_THAT(
       response_cached.request()->GetAddressResults().value().endpoints(),
       testing::ElementsAre(kExpectedSecureIP));
