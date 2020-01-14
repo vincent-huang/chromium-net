@@ -108,7 +108,8 @@ size_t HpackFuzzUtil::SampleExponential(size_t mean, size_t sanity_bound) {
 }
 
 // static
-bool HpackFuzzUtil::NextHeaderBlock(Input* input, SpdyStringPiece* out) {
+bool HpackFuzzUtil::NextHeaderBlock(Input* input,
+                                    quiche::QuicheStringPiece* out) {
   // ClusterFuzz may truncate input files if the fuzzer ran out of allocated
   // disk space. Be tolerant of these.
   CHECK_LE(input->offset, input->input.size());
@@ -123,7 +124,7 @@ bool HpackFuzzUtil::NextHeaderBlock(Input* input, SpdyStringPiece* out) {
   if (input->remaining() < length) {
     return false;
   }
-  *out = SpdyStringPiece(input->ptr(), length);
+  *out = quiche::QuicheStringPiece(input->ptr(), length);
   input->offset += length;
   return true;
 }
@@ -145,7 +146,7 @@ void HpackFuzzUtil::InitializeFuzzerContext(FuzzerContext* context) {
 // static
 bool HpackFuzzUtil::RunHeaderBlockThroughFuzzerStages(
     FuzzerContext* context,
-    SpdyStringPiece input_block) {
+    quiche::QuicheStringPiece input_block) {
   // First stage: Decode the input header block. This may fail on invalid input.
   if (!context->first_stage->HandleControlFrameHeadersData(
           input_block.data(), input_block.size())) {
