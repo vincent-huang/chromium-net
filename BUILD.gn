@@ -6938,7 +6938,7 @@ fuzzer_test("net_hpack_decoder_fuzzer") {
 }
 
 proto_library("reporting_policy_proto") {
-  import_dirs = [ "//testing/libfuzzer/proto/" ]
+  proto_in_dir = "//"
   sources = [
     "reporting/reporting_policy.proto",
   ]
