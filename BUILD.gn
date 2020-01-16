@@ -760,7 +760,6 @@ component("net") {
       "http2/platform/impl/http2_flags_impl.h",
       "http2/platform/impl/http2_logging_impl.h",
       "http2/platform/impl/http2_macros_impl.h",
-      "http2/platform/impl/http2_optional_impl.h",
       "http2/platform/impl/http2_string_impl.h",
       "http2/platform/impl/http2_string_utils_impl.h",
       "log/file_net_log_observer.cc",
@@ -942,6 +941,8 @@ component("net") {
       "quiche/common/platform/impl/quiche_endian_impl.h",
       "quiche/common/platform/impl/quiche_export_impl.h",
       "quiche/common/platform/impl/quiche_logging_impl.h",
+      "quiche/common/platform/impl/quiche_optional_impl.h",
+      "quiche/common/platform/impl/quiche_ptr_util_impl.h",
       "quiche/common/platform/impl/quiche_str_cat_impl.h",
       "quiche/common/platform/impl/quiche_string_piece_impl.h",
       "quiche/common/platform/impl/quiche_text_utils_impl.h",
@@ -1031,7 +1032,6 @@ component("net") {
       "spdy/platform/impl/spdy_map_util_impl.h",
       "spdy/platform/impl/spdy_mem_slice_impl.cc",
       "spdy/platform/impl/spdy_mem_slice_impl.h",
-      "spdy/platform/impl/spdy_ptr_util_impl.h",
       "spdy/platform/impl/spdy_string_utils_impl.cc",
       "spdy/platform/impl/spdy_string_utils_impl.h",
       "spdy/platform/impl/spdy_test_utils_prod_impl.h",
@@ -1073,6 +1073,8 @@ component("net") {
       "third_party/quiche/src/common/platform/api/quiche_endian.h",
       "third_party/quiche/src/common/platform/api/quiche_export.h",
       "third_party/quiche/src/common/platform/api/quiche_logging.h",
+      "third_party/quiche/src/common/platform/api/quiche_optional.h",
+      "third_party/quiche/src/common/platform/api/quiche_ptr_util.h",
       "third_party/quiche/src/common/platform/api/quiche_str_cat.h",
       "third_party/quiche/src/common/platform/api/quiche_string_piece.h",
       "third_party/quiche/src/common/platform/api/quiche_text_utils.h",
@@ -1173,7 +1175,6 @@ component("net") {
       "third_party/quiche/src/http2/platform/api/http2_flags.h",
       "third_party/quiche/src/http2/platform/api/http2_logging.h",
       "third_party/quiche/src/http2/platform/api/http2_macros.h",
-      "third_party/quiche/src/http2/platform/api/http2_optional.h",
       "third_party/quiche/src/http2/platform/api/http2_string_utils.h",
       "third_party/quiche/src/quic/core/congestion_control/bandwidth_sampler.cc",
       "third_party/quiche/src/quic/core/congestion_control/bandwidth_sampler.h",
@@ -1648,7 +1649,6 @@ component("net") {
       "third_party/quiche/src/spdy/platform/api/spdy_macros.h",
       "third_party/quiche/src/spdy/platform/api/spdy_map_util.h",
       "third_party/quiche/src/spdy/platform/api/spdy_mem_slice.h",
-      "third_party/quiche/src/spdy/platform/api/spdy_ptr_util.h",
       "third_party/quiche/src/spdy/platform/api/spdy_string_utils.h",
       "url_request/redirect_info.cc",
       "url_request/redirect_info.h",
@@ -3111,6 +3111,7 @@ if (is_linux) {
       "quic/platform/impl/quic_socket_utils.cc",
       "quic/platform/impl/quic_socket_utils.h",
       "quic/platform/impl/quic_stream_buffer_allocator_impl.h",
+      "quic/platform/impl/quic_udp_socket_platform_impl.h",
       "third_party/quiche/src/quic/core/quic_default_packet_writer.cc",
       "third_party/quiche/src/quic/core/quic_default_packet_writer.h",
       "third_party/quiche/src/quic/core/quic_epoll_alarm_factory.cc",
@@ -3119,8 +3120,11 @@ if (is_linux) {
       "third_party/quiche/src/quic/core/quic_epoll_connection_helper.h",
       "third_party/quiche/src/quic/core/quic_packet_reader.cc",
       "third_party/quiche/src/quic/core/quic_packet_reader.h",
+      "third_party/quiche/src/quic/core/quic_udp_socket.h",
+      "third_party/quiche/src/quic/core/quic_udp_socket_posix.cc",
       "third_party/quiche/src/quic/platform/api/quic_epoll.h",
       "third_party/quiche/src/quic/platform/api/quic_stream_buffer_allocator.h",
+      "third_party/quiche/src/quic/platform/api/quic_udp_socket_platform_api.h",
       "third_party/quiche/src/quic/tools/quic_client.cc",
       "third_party/quiche/src/quic/tools/quic_client.h",
       "third_party/quiche/src/quic/tools/quic_client_epoll_network_helper.cc",
@@ -5906,6 +5910,10 @@ test("net_unittests") {
       ":epoll_server",
       ":epoll_server_test_tools",
     ]
+
+    if (!is_chromeos) {
+      sources += [ "third_party/quiche/src/quic/core/quic_udp_socket_test.cc" ]
+    }
   }
 
   if (is_mac || is_ios) {
