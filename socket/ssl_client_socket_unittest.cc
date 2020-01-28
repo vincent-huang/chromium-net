@@ -157,6 +157,7 @@ class ReadBufferingStreamSocket : public WrappedStreamSocket {
   int DoRead();
   int DoReadComplete(int result);
   void OnReadCompleted(int result);
+  int CopyToCaller(IOBuffer* buf);
 
   State state_;
   scoped_refptr<GrowableIOBuffer> read_buffer_;
@@ -209,8 +210,11 @@ int ReadBufferingStreamSocket::ReadIfReady(IOBuffer* buf,
 
   state_ = STATE_READ;
   int rv = DoLoop(OK);
-  if (rv == ERR_IO_PENDING)
+  if (rv == OK) {
+    rv = CopyToCaller(buf);
+  } else if (rv == ERR_IO_PENDING) {
     user_read_callback_ = std::move(callback);
+  }
   return rv;
 }
 
@@ -252,20 +256,10 @@ int ReadBufferingStreamSocket::DoReadComplete(int result) {
 
   read_buffer_->set_offset(read_buffer_->offset() + result);
   if (read_buffer_->RemainingCapacity() > 0) {
+    // Keep reading until |read_buffer_| is full.
     state_ = STATE_READ;
-    return OK;
   }
-
-  // If ReadIfReady() is called by the user and this is an asynchronous
-  // completion, notify the user that read can be retried.
-  if (user_read_buf_ == nullptr)
-    return OK;
-
-  memcpy(user_read_buf_->data(),
-         read_buffer_->StartOfBuffer(),
-         read_buffer_->capacity());
-  read_buffer_->set_offset(0);
-  return read_buffer_->capacity();
+  return OK;
 }
 
 void ReadBufferingStreamSocket::OnReadCompleted(int result) {
@@ -275,8 +269,20 @@ void ReadBufferingStreamSocket::OnReadCompleted(int result) {
   result = DoLoop(result);
   if (result == ERR_IO_PENDING)
     return;
-  user_read_buf_ = nullptr;
+  if (result == OK && user_read_buf_) {
+    // If the user called Read(), return the data to the caller.
+    result = CopyToCaller(user_read_buf_.get());
+    user_read_buf_ = nullptr;
+  }
   std::move(user_read_callback_).Run(result);
+}
+
+int ReadBufferingStreamSocket::CopyToCaller(IOBuffer* buf) {
+  // Note this assumes |buf| is large enough for |read_buffer_|. ReadIfReady()
+  // rejects small reads.
+  memcpy(buf->data(), read_buffer_->StartOfBuffer(), read_buffer_->capacity());
+  read_buffer_->set_offset(0);
+  return read_buffer_->capacity();
 }
 
 // Simulates synchronously receiving an error during Read() or Write()
@@ -2405,13 +2411,7 @@ TEST_P(SSLClientSocketReadTest, Read_SmallChunks) {
   } while (rv > 0);
 }
 
-#if defined(OS_CHROMEOS)
-// TODO(crbug.com/1045656) Flaky on ChromeOS.
-#define MAYBE_Read_ManySmallRecords DISABLED_Read_ManySmallRecords
-#else
-#define MAYBE_Read_ManySmallRecords Read_ManySmallRecords
-#endif
-TEST_P(SSLClientSocketReadTest, MAYBE_Read_ManySmallRecords) {
+TEST_P(SSLClientSocketReadTest, Read_ManySmallRecords) {
   ASSERT_TRUE(
       StartEmbeddedTestServer(EmbeddedTestServer::CERT_OK, GetServerConfig()));
 
