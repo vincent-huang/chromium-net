@@ -4549,7 +4549,10 @@ test("net_unittests") {
   }
 
   data = []
-  data_deps = [ "third_party/nist-pkits/" ]
+  data_deps = [
+    "third_party/nist-pkits/",
+    "//testing/buildbot/filters:net_unittests_filters",
+  ]
 
   if (is_linux || is_mac || is_win || is_fuchsia) {
     deps += [
