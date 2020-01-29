@@ -850,7 +850,6 @@ component("net") {
       "quic/network_connection.cc",
       "quic/network_connection.h",
       "quic/platform/impl/quic_aligned_impl.h",
-      "quic/platform/impl/quic_bbr2_sender_impl.h",
       "quic/platform/impl/quic_bug_tracker_impl.h",
       "quic/platform/impl/quic_cert_utils_impl.h",
       "quic/platform/impl/quic_chromium_clock.cc",
