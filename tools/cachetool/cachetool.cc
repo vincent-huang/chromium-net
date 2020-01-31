@@ -15,11 +15,13 @@
 #include "base/message_loop/message_pump_type.h"
 #include "base/run_loop.h"
 #include "base/stl_util.h"
+#include "base/strings/utf_string_conversions.h"
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_piece.h"
 #include "base/strings/stringprintf.h"
 #include "base/task/single_thread_task_executor.h"
 #include "base/task/thread_pool/thread_pool_instance.h"
+#include "build/build_config.h"
 #include "net/base/io_buffer.h"
 #include "net/base/test_completion_callback.h"
 #include "net/disk_cache/disk_cache.h"
@@ -171,7 +173,11 @@ class ProgramArgumentCommandMarshal final : public CommandMarshal {
   // Implements CommandMarshal.
   std::string ReadString() override {
     if (args_id_ < command_line_args_.size())
+#if defined(OS_WIN)
+      return base::WideToUTF8(command_line_args_[args_id_++]);
+#else
       return command_line_args_[args_id_++];
+#endif
     if (!has_failed())
       ReturnFailure("Command line arguments to short.");
     return "";
@@ -694,7 +700,11 @@ int main(int argc, char* argv[]) {
   base::ThreadPoolInstance::CreateAndStartWithDefaultParams("cachetool");
 
   base::FilePath cache_path(args[0]);
+#if defined(OS_WIN)
+  std::string cache_backend_type(base::WideToUTF8(args[1]));
+#else
   std::string cache_backend_type(args[1]);
+#endif
 
   net::BackendType backend_type;
   if (cache_backend_type == "simple") {
