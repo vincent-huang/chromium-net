@@ -2434,7 +2434,7 @@ if (use_external_gssapi) {
   }
 }
 
-if (is_linux || is_mac || is_win) {
+if (is_linux || is_mac) {
   executable("cachetool") {
     testonly = true
     sources = [ "tools/cachetool/cachetool.cc" ]
