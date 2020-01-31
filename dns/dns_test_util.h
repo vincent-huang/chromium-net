@@ -22,6 +22,7 @@
 #include "net/dns/dns_response.h"
 #include "net/dns/dns_transaction.h"
 #include "net/dns/dns_util.h"
+#include "net/dns/esni_content.h"
 #include "net/dns/public/dns_protocol.h"
 
 namespace net {
@@ -200,6 +201,7 @@ std::string GenerateWellFormedEsniKeys(base::StringPiece custom_data = "");
 class AddressSorter;
 class DnsClient;
 class IPAddress;
+class ResolveContext;
 class URLRequestContext;
 
 // Builds an address record for the given name and IP.
@@ -300,10 +302,10 @@ class MockDnsTransactionFactory : public DnsTransactionFactory {
       const NetLogWithSource&,
       bool secure,
       DnsConfig::SecureDnsMode secure_dns_mode,
-      URLRequestContext* url_request_context) override;
+      ResolveContext* resolve_context) override;
 
   std::unique_ptr<DnsProbeRunner> CreateDohProbeRunner(
-      URLRequestContext* url_request_context) override;
+      ResolveContext* resolve_context) override;
 
   void AddEDNSOption(const OptRecordRdata::Opt& opt) override;
 
@@ -340,7 +342,8 @@ class MockDnsClient : public DnsClient {
   bool CanUseSecureDnsTransactions() const override;
   bool CanUseInsecureDnsTransactions() const override;
   void SetInsecureEnabled(bool enabled) override;
-  bool FallbackFromSecureTransactionPreferred() const override;
+  bool FallbackFromSecureTransactionPreferred(
+      ResolveContext* resolve_context) const override;
   bool FallbackFromInsecureTransactionPreferred() const override;
   bool SetSystemConfig(base::Optional<DnsConfig> system_config) override;
   bool SetConfigOverrides(DnsConfigOverrides config_overrides) override;

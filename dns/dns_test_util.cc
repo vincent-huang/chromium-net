@@ -18,6 +18,7 @@
 #include "net/dns/dns_hosts.h"
 #include "net/dns/dns_query.h"
 #include "net/dns/dns_util.h"
+#include "net/dns/resolve_context.h"
 #include "testing/gtest/include/gtest/gtest.h"
 
 namespace net {
@@ -613,18 +614,18 @@ std::unique_ptr<DnsTransaction> MockDnsTransactionFactory::CreateTransaction(
     const NetLogWithSource&,
     bool secure,
     DnsConfig::SecureDnsMode secure_dns_mode,
-    URLRequestContext* url_request_context) {
+    ResolveContext* resolve_context) {
   std::unique_ptr<MockTransaction> transaction =
-      std::make_unique<MockTransaction>(rules_, hostname, qtype, secure,
-                                        secure_dns_mode, url_request_context,
-                                        std::move(callback));
+      std::make_unique<MockTransaction>(
+          rules_, hostname, qtype, secure, secure_dns_mode,
+          resolve_context->url_request_context(), std::move(callback));
   if (transaction->delayed())
     delayed_transactions_.push_back(transaction->AsWeakPtr());
   return transaction;
 }
 
 std::unique_ptr<DnsProbeRunner> MockDnsTransactionFactory::CreateDohProbeRunner(
-    URLRequestContext* url_request_context) {
+    ResolveContext* resolve_context) {
   return std::make_unique<MockDohProbeRunner>(weak_ptr_factory_.GetWeakPtr());
 }
 
@@ -680,7 +681,8 @@ void MockDnsClient::SetInsecureEnabled(bool enabled) {
   insecure_enabled_ = enabled;
 }
 
-bool MockDnsClient::FallbackFromSecureTransactionPreferred() const {
+bool MockDnsClient::FallbackFromSecureTransactionPreferred(
+    ResolveContext* context) const {
   return !CanUseSecureDnsTransactions() || !doh_server_available_;
 }
 

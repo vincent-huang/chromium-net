@@ -231,57 +231,6 @@ TEST_F(ContextHostResolverTest, DestroyResolver) {
   EXPECT_FALSE(callback1.have_result());
 }
 
-// Test that cancelling a resolver cancels its (and only its) requests, even if
-// those requests shared a job (same query) with another resolver's requests.
-TEST_F(ContextHostResolverTest, DestroyResolver_RemainingRequests) {
-  // Set up delayed results for "example.com".
-  MockDnsClientRuleList rules;
-  rules.emplace_back("example.com", dns_protocol::kTypeA, false /* secure */,
-                     MockDnsClientRule::Result(BuildTestDnsResponse(
-                         "example.com", kEndpoint.address())),
-                     true /* delay */);
-  rules.emplace_back("example.com", dns_protocol::kTypeAAAA, false /* secure */,
-                     MockDnsClientRule::Result(MockDnsClientRule::EMPTY),
-                     false /* delay */);
-  SetMockDnsRules(std::move(rules));
-
-  // Make ResolveHostRequests the same hostname for both resolvers.
-  auto resolver1 = std::make_unique<ContextHostResolver>(
-      manager_.get(), nullptr /* host_cache */);
-  std::unique_ptr<HostResolver::ResolveHostRequest> request1 =
-      resolver1->CreateRequest(HostPortPair("example.com", 100),
-                               NetworkIsolationKey(), NetLogWithSource(),
-                               base::nullopt);
-  auto resolver2 = std::make_unique<ContextHostResolver>(
-      manager_.get(), nullptr /* host_cache */);
-  std::unique_ptr<HostResolver::ResolveHostRequest> request2 =
-      resolver2->CreateRequest(HostPortPair("example.com", 100),
-                               NetworkIsolationKey(), NetLogWithSource(),
-                               base::nullopt);
-
-  TestCompletionCallback callback1;
-  int rv1 = request1->Start(callback1.callback());
-  TestCompletionCallback callback2;
-  int rv2 = request2->Start(callback2.callback());
-
-  // Test relies on assumption that requests share jobs, so assert just 1.
-  ASSERT_EQ(1u, manager_->num_jobs_for_testing());
-
-  // Cancel |resolver1| before allowing delayed requests to complete.
-  resolver1 = nullptr;
-  dns_client_->CompleteDelayedTransactions();
-
-  EXPECT_THAT(callback2.GetResult(rv2), test::IsOk());
-  EXPECT_THAT(request2->GetResolveErrorInfo().error, test::IsError(net::OK));
-  EXPECT_THAT(request2->GetAddressResults().value().endpoints(),
-              testing::ElementsAre(kEndpoint));
-
-  // Ensure |request1| never completes.
-  base::RunLoop().RunUntilIdle();
-  EXPECT_THAT(rv1, test::IsError(ERR_IO_PENDING));
-  EXPECT_FALSE(callback1.have_result());
-}
-
 TEST_F(ContextHostResolverTest, DestroyResolver_CompletedRequests) {
   MockDnsClientRuleList rules;
   rules.emplace_back("example.com", dns_protocol::kTypeA, false /* secure */,

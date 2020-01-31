@@ -50,7 +50,7 @@ class MDnsSocketFactory;
 class NetLog;
 class NetLogWithSource;
 class NetworkIsolationKey;
-class URLRequestContext;
+class ResolveContext;
 
 // Scheduler and controller of host resolution requests. Because of the global
 // nature of host resolutions, this class is generally expected to be singleton
@@ -142,19 +142,19 @@ class NET_EXPORT HostResolverManager
   // If |host_cache| is non-null, its HostCache::Invalidator must have already
   // been added (via AddHostCacheInvalidator()). If |optional_parameters|
   // specifies any cache usage other than LOCAL_ONLY, there must be a 1:1
-  // correspondence between |request_context| and |host_cache|, and both should
+  // correspondence between |resolve_context| and |host_cache|, and both should
   // come from the same ContextHostResolver.
   std::unique_ptr<CancellableResolveHostRequest> CreateRequest(
       const HostPortPair& host,
       const NetworkIsolationKey& network_isolation_key,
       const NetLogWithSource& net_log,
       const base::Optional<ResolveHostParameters>& optional_parameters,
-      URLRequestContext* request_context,
+      ResolveContext* resolve_context,
       HostCache* host_cache);
-  // |request_context| is the context to use for the probes, and it is expected
+  // |resolve_context| is the context to use for the probes, and it is expected
   // to be the context of the calling ContextHostResolver.
   std::unique_ptr<CancellableProbeRequest> CreateDohProbeRequest(
-      URLRequestContext* request_context);
+      ResolveContext* resolvet_context);
   std::unique_ptr<MdnsListener> CreateMdnsListener(const HostPortPair& host,
                                                    DnsQueryType query_type);
 
@@ -289,6 +289,7 @@ class NET_EXPORT HostResolverManager
       ResolveHostParameters::CacheUsage cache_usage,
       const NetLogWithSource& request_net_log,
       HostCache* cache,
+      ResolveContext* resolve_context,
       DnsQueryType* out_effective_query_type,
       HostResolverFlags* out_effective_host_resolver_flags,
       DnsConfig::SecureDnsMode* out_effective_secure_dns_mode,
@@ -356,6 +357,7 @@ class NET_EXPORT HostResolverManager
                     bool insecure_tasks_allowed,
                     bool allow_cache,
                     bool prioritize_local_lookups,
+                    ResolveContext* resolve_context,
                     std::deque<TaskType>* out_tasks);
 
   // Initialized the sequence of tasks to run to resolve a request. The sequence
@@ -367,6 +369,7 @@ class NET_EXPORT HostResolverManager
       HostResolverFlags flags,
       base::Optional<SecureDnsMode> secure_dns_mode_override,
       ResolveHostParameters::CacheUsage cache_usage,
+      ResolveContext* resolve_context,
       DnsConfig::SecureDnsMode* out_effective_secure_dns_mode,
       std::deque<TaskType>* out_tasks);
 
@@ -381,6 +384,7 @@ class NET_EXPORT HostResolverManager
       ResolveHostParameters::CacheUsage cache_usage,
       const IPAddress* ip_address,
       const NetLogWithSource& net_log,
+      ResolveContext* resolve_context,
       DnsQueryType* out_effective_type,
       HostResolverFlags* out_effective_flags,
       DnsConfig::SecureDnsMode* out_effective_secure_dns_mode,
@@ -456,7 +460,7 @@ class NET_EXPORT HostResolverManager
   // Returns |nullptr| if DoH probes are currently not allowed (due to
   // configuration or current connection state).
   std::unique_ptr<DnsProbeRunner> CreateDohProbeRunner(
-      URLRequestContext* url_request_context);
+      ResolveContext* resolve_context);
 
   // Used for multicast DNS tasks. Created on first use using
   // GetOrCreateMndsClient().

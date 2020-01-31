@@ -18,6 +18,7 @@
 #include "net/dns/host_resolver_manager.h"
 #include "net/dns/host_resolver_proc.h"
 #include "net/dns/public/resolve_error_info.h"
+#include "net/dns/resolve_context.h"
 #include "net/url_request/url_request_context.h"
 
 namespace net {
@@ -246,7 +247,10 @@ class ContextHostResolver::WrappedProbeRequest
 
 ContextHostResolver::ContextHostResolver(HostResolverManager* manager,
                                          std::unique_ptr<HostCache> host_cache)
-    : manager_(manager), host_cache_(std::move(host_cache)) {
+    : manager_(manager),
+      resolve_context_(
+          std::make_unique<ResolveContext>(nullptr /* url_request_context */)),
+      host_cache_(std::move(host_cache)) {
   DCHECK(manager_);
 
   if (host_cache_)
@@ -258,6 +262,8 @@ ContextHostResolver::ContextHostResolver(
     std::unique_ptr<HostCache> host_cache)
     : manager_(owned_manager.get()),
       owned_manager_(std::move(owned_manager)),
+      resolve_context_(
+          std::make_unique<ResolveContext>(nullptr /* url_request_context */)),
       host_cache_(std::move(host_cache)) {
   DCHECK(manager_);
 
@@ -283,9 +289,10 @@ void ContextHostResolver::OnShutdown() {
   for (auto* active_request : handed_out_requests_)
     active_request->OnShutdown();
 
-  DCHECK(context_);
+  DCHECK(resolve_context_);
+  DCHECK(!shutting_down_);
 
-  context_ = nullptr;
+  resolve_context_.reset();
   shutting_down_ = true;
 }
 
@@ -300,9 +307,9 @@ ContextHostResolver::CreateRequest(
   std::unique_ptr<HostResolverManager::CancellableResolveHostRequest>
       inner_request;
   if (!shutting_down_) {
-    inner_request = manager_->CreateRequest(host, network_isolation_key,
-                                            source_net_log, optional_parameters,
-                                            context_, host_cache_.get());
+    inner_request = manager_->CreateRequest(
+        host, network_isolation_key, source_net_log, optional_parameters,
+        resolve_context_.get(), host_cache_.get());
   }
 
   auto request = std::make_unique<WrappedResolveHostRequest>(
@@ -317,7 +324,7 @@ ContextHostResolver::CreateDohProbeRequest() {
 
   std::unique_ptr<HostResolverManager::CancellableProbeRequest> inner_request;
   if (!shutting_down_) {
-    inner_request = manager_->CreateDohProbeRequest(context_);
+    inner_request = manager_->CreateDohProbeRequest(resolve_context_.get());
   }
 
   auto request = std::make_unique<WrappedProbeRequest>(std::move(inner_request),
@@ -342,12 +349,12 @@ std::unique_ptr<base::Value> ContextHostResolver::GetDnsConfigAsValue() const {
 
 void ContextHostResolver::SetRequestContext(
     URLRequestContext* request_context) {
-  DCHECK(request_context);
-  DCHECK(!context_);
+  DCHECK(handed_out_requests_.empty());
   DCHECK(!shutting_down_);
+  DCHECK(!resolve_context_->url_request_context());
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  context_ = request_context;
+  resolve_context_ = std::make_unique<ResolveContext>(request_context);
 }
 
 HostResolverManager* ContextHostResolver::GetManagerForTesting() {
@@ -355,7 +362,7 @@ HostResolverManager* ContextHostResolver::GetManagerForTesting() {
 }
 
 const URLRequestContext* ContextHostResolver::GetContextForTesting() const {
-  return context_;
+  return resolve_context_ ? resolve_context_->url_request_context() : nullptr;
 }
 
 size_t ContextHostResolver::LastRestoredCacheSize() const {

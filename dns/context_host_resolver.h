@@ -23,6 +23,7 @@ namespace net {
 class HostCache;
 class HostResolverManager;
 struct ProcTaskParams;
+class ResolveContext;
 class URLRequestContext;
 
 // Wrapper for HostResolverManager, expected to be owned by a URLRequestContext,
@@ -87,7 +88,7 @@ class NET_EXPORT ContextHostResolver : public HostResolver {
   // on resolver destruction.
   std::unordered_set<WrappedRequest*> handed_out_requests_;
 
-  URLRequestContext* context_ = nullptr;
+  std::unique_ptr<ResolveContext> resolve_context_;
   std::unique_ptr<HostCache> host_cache_;
 
   // If true, the context is shutting down. Subsequent request Start() calls
