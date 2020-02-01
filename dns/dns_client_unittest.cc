@@ -12,6 +12,7 @@
 #include "net/base/ip_address.h"
 #include "net/base/ip_endpoint.h"
 #include "net/dns/dns_config.h"
+#include "net/dns/dns_session.h"
 #include "net/dns/dns_test_util.h"
 #include "net/dns/resolve_context.h"
 #include "net/socket/socket_test_util.h"
@@ -67,7 +68,8 @@ class DnsClientTest : public TestWithTaskEnvironment {
   }
 
   URLRequestContext request_context_;
-  ResolveContext resolve_context_{&request_context_};
+  ResolveContext resolve_context_{&request_context_,
+                                  false /* enable_caching */};
   std::unique_ptr<DnsClient> client_;
   AlwaysFailSocketFactory socket_factory_;
 };
@@ -84,6 +86,7 @@ TEST_F(DnsClientTest, NoConfig) {
   EXPECT_FALSE(client_->GetEffectiveConfig());
   EXPECT_FALSE(client_->GetHosts());
   EXPECT_FALSE(client_->GetTransactionFactory());
+  EXPECT_FALSE(client_->GetCurrentSession());
 }
 
 TEST_F(DnsClientTest, InvalidConfig) {
@@ -99,6 +102,7 @@ TEST_F(DnsClientTest, InvalidConfig) {
   EXPECT_FALSE(client_->GetEffectiveConfig());
   EXPECT_FALSE(client_->GetHosts());
   EXPECT_FALSE(client_->GetTransactionFactory());
+  EXPECT_FALSE(client_->GetCurrentSession());
 }
 
 TEST_F(DnsClientTest, CanUseSecureDnsTransactions_NoDohServers) {
@@ -115,6 +119,7 @@ TEST_F(DnsClientTest, CanUseSecureDnsTransactions_NoDohServers) {
               testing::Pointee(BasicValidConfig()));
   EXPECT_TRUE(client_->GetHosts());
   EXPECT_TRUE(client_->GetTransactionFactory());
+  EXPECT_EQ(client_->GetCurrentSession()->config(), BasicValidConfig());
 }
 
 TEST_F(DnsClientTest, InsecureNotEnabled) {
@@ -131,6 +136,7 @@ TEST_F(DnsClientTest, InsecureNotEnabled) {
               testing::Pointee(ValidConfigWithDoh()));
   EXPECT_TRUE(client_->GetHosts());
   EXPECT_TRUE(client_->GetTransactionFactory());
+  EXPECT_EQ(client_->GetCurrentSession()->config(), ValidConfigWithDoh());
 }
 
 TEST_F(DnsClientTest, CanUseSecureDnsTransactions_ProbeSuccess) {
@@ -160,6 +166,7 @@ TEST_F(DnsClientTest, DnsOverTlsActive) {
   EXPECT_THAT(client_->GetEffectiveConfig(), testing::Pointee(config));
   EXPECT_TRUE(client_->GetHosts());
   EXPECT_TRUE(client_->GetTransactionFactory());
+  EXPECT_EQ(client_->GetCurrentSession()->config(), config);
 }
 
 TEST_F(DnsClientTest, AllAllowed) {
@@ -177,6 +184,7 @@ TEST_F(DnsClientTest, AllAllowed) {
               testing::Pointee(ValidConfigWithDoh()));
   EXPECT_TRUE(client_->GetHosts());
   EXPECT_TRUE(client_->GetTransactionFactory());
+  EXPECT_EQ(client_->GetCurrentSession()->config(), ValidConfigWithDoh());
 }
 
 TEST_F(DnsClientTest, FallbackFromInsecureTransactionPreferred_Failures) {
@@ -212,15 +220,19 @@ TEST_F(DnsClientTest, Override) {
   client_->SetSystemConfig(BasicValidConfig());
   EXPECT_THAT(client_->GetEffectiveConfig(),
               testing::Pointee(BasicValidConfig()));
+  EXPECT_EQ(client_->GetCurrentSession()->config(), BasicValidConfig());
 
   client_->SetConfigOverrides(BasicValidOverrides());
   EXPECT_THAT(client_->GetEffectiveConfig(),
               testing::Pointee(
                   BasicValidOverrides().ApplyOverrides(BasicValidConfig())));
+  EXPECT_EQ(client_->GetCurrentSession()->config(),
+            BasicValidOverrides().ApplyOverrides(BasicValidConfig()));
 
   client_->SetConfigOverrides(DnsConfigOverrides());
   EXPECT_THAT(client_->GetEffectiveConfig(),
               testing::Pointee(BasicValidConfig()));
+  EXPECT_EQ(client_->GetCurrentSession()->config(), BasicValidConfig());
 }
 
 // Cannot apply overrides without a system config unless everything is
@@ -228,6 +240,7 @@ TEST_F(DnsClientTest, Override) {
 TEST_F(DnsClientTest, OverrideNoConfig) {
   client_->SetConfigOverrides(BasicValidOverrides());
   EXPECT_FALSE(client_->GetEffectiveConfig());
+  EXPECT_FALSE(client_->GetCurrentSession());
 
   auto override_everything =
       DnsConfigOverrides::CreateOverridingEverythingWithDefaults();
@@ -237,28 +250,35 @@ TEST_F(DnsClientTest, OverrideNoConfig) {
   EXPECT_THAT(
       client_->GetEffectiveConfig(),
       testing::Pointee(override_everything.ApplyOverrides(DnsConfig())));
+  EXPECT_EQ(client_->GetCurrentSession()->config(),
+            override_everything.ApplyOverrides(DnsConfig()));
 }
 
 TEST_F(DnsClientTest, OverrideInvalidConfig) {
   client_->SetSystemConfig(DnsConfig());
   EXPECT_FALSE(client_->GetEffectiveConfig());
+  EXPECT_FALSE(client_->GetCurrentSession());
 
   client_->SetConfigOverrides(BasicValidOverrides());
   EXPECT_THAT(client_->GetEffectiveConfig(),
               testing::Pointee(
                   BasicValidOverrides().ApplyOverrides(BasicValidConfig())));
+  EXPECT_EQ(client_->GetCurrentSession()->config(),
+            BasicValidOverrides().ApplyOverrides(DnsConfig()));
 }
 
 TEST_F(DnsClientTest, OverrideToInvalid) {
   client_->SetSystemConfig(BasicValidConfig());
   EXPECT_THAT(client_->GetEffectiveConfig(),
               testing::Pointee(BasicValidConfig()));
+  EXPECT_EQ(client_->GetCurrentSession()->config(), BasicValidConfig());
 
   DnsConfigOverrides overrides;
   overrides.nameservers.emplace();
   client_->SetConfigOverrides(std::move(overrides));
 
   EXPECT_FALSE(client_->GetEffectiveConfig());
+  EXPECT_FALSE(client_->GetCurrentSession());
 }
 
 }  // namespace

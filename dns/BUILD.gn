@@ -425,6 +425,7 @@ source_set("tests") {
 }
 
 source_set("test_support") {
+  visibility = [ "//net:test_support" ]
   testonly = true
   sources = [
     "address_info_test_util.cc",

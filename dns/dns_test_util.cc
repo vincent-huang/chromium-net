@@ -17,6 +17,7 @@
 #include "net/dns/address_sorter.h"
 #include "net/dns/dns_hosts.h"
 #include "net/dns/dns_query.h"
+#include "net/dns/dns_session.h"
 #include "net/dns/dns_util.h"
 #include "net/dns/resolve_context.h"
 #include "testing/gtest/include/gtest/gtest.h"
@@ -662,6 +663,7 @@ MockDnsClient::MockDnsClient(DnsConfig config, MockDnsClientRuleList rules)
       factory_(new MockDnsTransactionFactory(std::move(rules))),
       address_sorter_(new MockAddressSorter()) {
   effective_config_ = BuildEffectiveConfig();
+  session_ = BuildSession();
 }
 
 MockDnsClient::~MockDnsClient() = default;
@@ -698,6 +700,7 @@ bool MockDnsClient::SetSystemConfig(base::Optional<DnsConfig> system_config) {
   base::Optional<DnsConfig> before = effective_config_;
   config_ = std::move(system_config);
   effective_config_ = BuildEffectiveConfig();
+  session_ = BuildSession();
   return before != effective_config_;
 }
 
@@ -705,7 +708,12 @@ bool MockDnsClient::SetConfigOverrides(DnsConfigOverrides config_overrides) {
   base::Optional<DnsConfig> before = effective_config_;
   overrides_ = std::move(config_overrides);
   effective_config_ = BuildEffectiveConfig();
+  session_ = BuildSession();
   return before != effective_config_;
+}
+
+DnsSession* MockDnsClient::GetCurrentSession() {
+  return session_.get();
 }
 
 const DnsConfig* MockDnsClient::GetEffectiveConfig() const {
@@ -766,6 +774,21 @@ base::Optional<DnsConfig> MockDnsClient::BuildEffectiveConfig() {
     return base::nullopt;
 
   return overrides_.ApplyOverrides(config_.value());
+}
+
+scoped_refptr<DnsSession> MockDnsClient::BuildSession() {
+  if (!effective_config_)
+    return nullptr;
+
+  // Session not expected to be used for anything that will actually require
+  // random numbers.
+  auto null_random_callback =
+      base::BindRepeating([](int, int) -> int { IMMEDIATE_CRASH(); });
+
+  return base::MakeRefCounted<DnsSession>(
+      effective_config_.value(),
+      DnsSocketPool::CreateNull(&socket_factory_, null_random_callback),
+      null_random_callback, nullptr /* NetLog */);
 }
 
 }  // namespace net

@@ -2824,10 +2824,9 @@ HostResolverManager::CreateRequest(
   DVLOG(4) << "HostResolverManager::CreateRequest: host_cache=" << host_cache
            << ", host=" << host.ToString();
 
-  // HostCaches must add invalidators (via AddHostCacheInvalidator()) before use
-  // to ensure they are invalidated on network and configuration changes.
-  if (host_cache)
-    DCHECK(host_cache_invalidators_.HasObserver(host_cache->invalidator()));
+  // ResolveContexts must register (via RegisterResolveContext()) before use to
+  // ensure cached data is invalidated on network and configuration changes.
+  DCHECK(registered_contexts_.HasObserver(resolve_context));
 
   return std::make_unique<RequestImpl>(
       net_log, host, network_isolation_key, optional_parameters,
@@ -2922,14 +2921,13 @@ void HostResolverManager::SetDnsConfigOverrides(DnsConfigOverrides overrides) {
   }
 }
 
-void HostResolverManager::AddHostCacheInvalidator(
-    HostCache::Invalidator* invalidator) {
-  host_cache_invalidators_.AddObserver(invalidator);
+void HostResolverManager::RegisterResolveContext(ResolveContext* context) {
+  registered_contexts_.AddObserver(context);
 }
 
-void HostResolverManager::RemoveHostCacheInvalidator(
-    const HostCache::Invalidator* invalidator) {
-  host_cache_invalidators_.RemoveObserver(invalidator);
+void HostResolverManager::DeregisterResolveContext(
+    const ResolveContext* context) {
+  registered_contexts_.RemoveObserver(context);
 }
 
 void HostResolverManager::SetTickClockForTesting(
@@ -3857,8 +3855,10 @@ void HostResolverManager::InvalidateCaches() {
 #endif
 
   invalidation_in_progress_ = true;
-  for (auto& invalidator : host_cache_invalidators_)
-    invalidator.Invalidate();
+  for (auto& context : registered_contexts_) {
+    context.InvalidateCaches(dns_client_ ? dns_client_->GetCurrentSession()
+                                         : nullptr);
+  }
   invalidation_in_progress_ = false;
 
 #if DCHECK_IS_ON()

@@ -141,6 +141,8 @@ class DnsClientImpl : public DnsClient,
     return UpdateDnsConfig();
   }
 
+  DnsSession* GetCurrentSession() override { return session_.get(); }
+
   const DnsConfig* GetEffectiveConfig() const override {
     if (!session_)
       return nullptr;

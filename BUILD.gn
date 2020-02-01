@@ -5293,8 +5293,8 @@ fuzzer_test("net_http_auth_handler_basic_fuzzer") {
   dict = "data/fuzzer_dictionaries/net_http_auth_handler_basic_fuzzer.dict"
   deps = [
     ":net_fuzzer_test_support",
+    ":test_support",
     "//net",
-    "//net/dns:test_support",
   ]
 }
 
@@ -5303,8 +5303,8 @@ fuzzer_test("net_http_auth_handler_digest_fuzzer") {
   dict = "data/fuzzer_dictionaries/net_http_auth_handler_digest_fuzzer.dict"
   deps = [
     ":net_fuzzer_test_support",
+    ":test_support",
     "//net",
-    "//net/dns:test_support",
   ]
 }
 

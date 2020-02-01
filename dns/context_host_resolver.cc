@@ -245,38 +245,30 @@ class ContextHostResolver::WrappedProbeRequest
   SEQUENCE_CHECKER(sequence_checker_);
 };
 
-ContextHostResolver::ContextHostResolver(HostResolverManager* manager,
-                                         std::unique_ptr<HostCache> host_cache)
-    : manager_(manager),
-      resolve_context_(
-          std::make_unique<ResolveContext>(nullptr /* url_request_context */)),
-      host_cache_(std::move(host_cache)) {
+ContextHostResolver::ContextHostResolver(
+    HostResolverManager* manager,
+    std::unique_ptr<ResolveContext> resolve_context)
+    : manager_(manager), resolve_context_(std::move(resolve_context)) {
   DCHECK(manager_);
+  DCHECK(resolve_context_);
 
-  if (host_cache_)
-    manager_->AddHostCacheInvalidator(host_cache_->invalidator());
+  manager_->RegisterResolveContext(resolve_context_.get());
 }
 
 ContextHostResolver::ContextHostResolver(
     std::unique_ptr<HostResolverManager> owned_manager,
-    std::unique_ptr<HostCache> host_cache)
-    : manager_(owned_manager.get()),
-      owned_manager_(std::move(owned_manager)),
-      resolve_context_(
-          std::make_unique<ResolveContext>(nullptr /* url_request_context */)),
-      host_cache_(std::move(host_cache)) {
-  DCHECK(manager_);
-
-  if (host_cache_)
-    manager_->AddHostCacheInvalidator(host_cache_->invalidator());
+    std::unique_ptr<ResolveContext> resolve_context)
+    : ContextHostResolver(owned_manager.get(), std::move(resolve_context)) {
+  owned_manager_ = std::move(owned_manager);
 }
 
 ContextHostResolver::~ContextHostResolver() {
   if (owned_manager_)
     DCHECK_EQ(owned_manager_.get(), manager_);
 
-  if (host_cache_)
-    manager_->RemoveHostCacheInvalidator(host_cache_->invalidator());
+  // No |resolve_context_| to deregister if OnShutdown() was already called.
+  if (resolve_context_)
+    manager_->DeregisterResolveContext(resolve_context_.get());
 
   // Silently cancel all requests associated with this resolver.
   while (!handed_out_requests_.empty())
@@ -290,9 +282,10 @@ void ContextHostResolver::OnShutdown() {
     active_request->OnShutdown();
 
   DCHECK(resolve_context_);
-  DCHECK(!shutting_down_);
-
+  manager_->DeregisterResolveContext(resolve_context_.get());
   resolve_context_.reset();
+
+  DCHECK(!shutting_down_);
   shutting_down_ = true;
 }
 
@@ -309,7 +302,7 @@ ContextHostResolver::CreateRequest(
   if (!shutting_down_) {
     inner_request = manager_->CreateRequest(
         host, network_isolation_key, source_net_log, optional_parameters,
-        resolve_context_.get(), host_cache_.get());
+        resolve_context_.get(), resolve_context_->host_cache());
   }
 
   auto request = std::make_unique<WrappedResolveHostRequest>(
@@ -340,7 +333,7 @@ ContextHostResolver::CreateMdnsListener(const HostPortPair& host,
 }
 
 HostCache* ContextHostResolver::GetHostCache() {
-  return host_cache_.get();
+  return resolve_context_->host_cache();
 }
 
 std::unique_ptr<base::Value> ContextHostResolver::GetDnsConfigAsValue() const {
@@ -351,10 +344,10 @@ void ContextHostResolver::SetRequestContext(
     URLRequestContext* request_context) {
   DCHECK(handed_out_requests_.empty());
   DCHECK(!shutting_down_);
-  DCHECK(!resolve_context_->url_request_context());
+  DCHECK(resolve_context_);
   DCHECK_CALLED_ON_VALID_SEQUENCE(sequence_checker_);
 
-  resolve_context_ = std::make_unique<ResolveContext>(request_context);
+  resolve_context_->set_url_request_context(request_context);
 }
 
 HostResolverManager* ContextHostResolver::GetManagerForTesting() {
@@ -366,11 +359,14 @@ const URLRequestContext* ContextHostResolver::GetContextForTesting() const {
 }
 
 size_t ContextHostResolver::LastRestoredCacheSize() const {
-  return host_cache_ ? host_cache_->last_restore_size() : 0;
+  return resolve_context_->host_cache()
+             ? resolve_context_->host_cache()->last_restore_size()
+             : 0;
 }
 
 size_t ContextHostResolver::CacheSize() const {
-  return host_cache_ ? host_cache_->size() : 0;
+  return resolve_context_->host_cache() ? resolve_context_->host_cache()->size()
+                                        : 0;
 }
 
 void ContextHostResolver::SetProcParamsForTesting(
@@ -381,8 +377,8 @@ void ContextHostResolver::SetProcParamsForTesting(
 void ContextHostResolver::SetTickClockForTesting(
     const base::TickClock* tick_clock) {
   manager_->SetTickClockForTesting(tick_clock);
-  if (host_cache_)
-    host_cache_->set_tick_clock_for_testing(tick_clock);
+  if (resolve_context_->host_cache())
+    resolve_context_->host_cache()->set_tick_clock_for_testing(tick_clock);
 }
 
 }  // namespace net

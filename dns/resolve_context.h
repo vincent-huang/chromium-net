@@ -5,8 +5,10 @@
 #ifndef NET_DNS_RESOLVE_CONTEXT_H_
 #define NET_DNS_RESOLVE_CONTEXT_H_
 
+#include <memory>
 #include <vector>
 
+#include "base/observer_list_types.h"
 #include "base/optional.h"
 #include "net/base/net_export.h"
 #include "net/dns/dns_config.h"
@@ -14,23 +16,23 @@
 namespace net {
 
 class DnsSession;
+class HostCache;
 class URLRequestContext;
 
 // Per-URLRequestContext data used by HostResolver. Expected to be owned by the
 // ContextHostResolver, and all usage/references are expected to be cleaned up
 // or cancelled before the URLRequestContext goes out of service.
-class NET_EXPORT_PRIVATE ResolveContext {
+class NET_EXPORT_PRIVATE ResolveContext : public base::CheckedObserver {
  public:
-  explicit ResolveContext(URLRequestContext* url_request_context);
+  ResolveContext(URLRequestContext* url_request_context, bool enable_caching);
 
   ResolveContext(const ResolveContext&) = delete;
   ResolveContext& operator=(const ResolveContext&) = delete;
 
-  ~ResolveContext();
+  ~ResolveContext() override;
 
   // Sets the "current" session for this ResolveContext and clears all session-
   // specific properties.
-  void SetCurrentSession(DnsSession* current_session);
 
   // Find the index of a DoH server to use for this attempt. Starts from
   // |starting_doh_server_index| and finds the first eligible server (wrapping
@@ -60,11 +62,30 @@ class NET_EXPORT_PRIVATE ResolveContext {
                        const DnsSession* session);
 
   URLRequestContext* url_request_context() { return url_request_context_; }
+  void set_url_request_context(URLRequestContext* url_request_context) {
+    DCHECK(!url_request_context_);
+    DCHECK(url_request_context);
+    url_request_context_ = url_request_context;
+  }
+
+  HostCache* host_cache() { return host_cache_.get(); }
+
+  // Invalidate or clear saved per-context cached data that is not expected to
+  // stay valid between connections or sessions (eg the HostCache and DNS server
+  // stats). |new_session|, if non-null, will be the new "current" session for
+  // which per-session data will be kept.
+  void InvalidateCaches(DnsSession* new_session);
+
+  const DnsSession* current_session_for_testing() const {
+    return current_session_;
+  }
 
  private:
   bool IsCurrentSession(const DnsSession* session) const;
 
   URLRequestContext* url_request_context_;
+
+  std::unique_ptr<HostCache> host_cache_;
 
   // Per-session data is only stored and valid for the latest session. Before
   // accessing, should check that |current_session_| is valid and matches a

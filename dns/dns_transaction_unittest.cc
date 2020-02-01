@@ -833,7 +833,8 @@ class DnsTransactionTestBase : public testing::Test {
     ConfigureFactory();
 
     request_context_ = std::make_unique<TestURLRequestContext>();
-    resolve_context_ = std::make_unique<ResolveContext>(request_context_.get());
+    resolve_context_ = std::make_unique<ResolveContext>(
+        request_context_.get(), nullptr /* host_cache */);
   }
 
   void TearDown() override {

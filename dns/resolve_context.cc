@@ -4,30 +4,22 @@
 
 #include "net/dns/resolve_context.h"
 
+#include <utility>
+
 #include "base/logging.h"
 #include "base/time/time.h"
 #include "net/base/network_change_notifier.h"
 #include "net/dns/dns_session.h"
+#include "net/dns/host_cache.h"
 
 namespace net {
 
-ResolveContext::ResolveContext(URLRequestContext* url_request_context)
-    : url_request_context_(url_request_context) {}
+ResolveContext::ResolveContext(URLRequestContext* url_request_context,
+                               bool enable_caching)
+    : url_request_context_(url_request_context),
+      host_cache_(enable_caching ? HostCache::CreateDefaultCache() : nullptr) {}
 
 ResolveContext::~ResolveContext() = default;
-
-void ResolveContext::SetCurrentSession(DnsSession* session) {
-  DCHECK(!IsCurrentSession(session));
-
-  current_session_ = session;
-
-  doh_server_availability_.clear();
-  if (session) {
-    doh_server_availability_.insert(
-        doh_server_availability_.begin(),
-        session->config().dns_over_https_servers.size(), false);
-  }
-}
 
 base::Optional<size_t> ResolveContext::DohServerIndexToUse(
     size_t starting_doh_server_index,
@@ -110,6 +102,26 @@ void ResolveContext::SetProbeSuccess(size_t doh_server_index,
   // first context enabling DoH or the last context disabling DoH.
   if (doh_available_before != NumAvailableDohServers(session) > 0)
     NetworkChangeNotifier::TriggerNonSystemDnsChange();
+}
+
+void ResolveContext::InvalidateCaches(DnsSession* new_session) {
+  if (host_cache_)
+    host_cache_->Invalidate();
+
+  // DNS config is constant for any given session, so if the current session is
+  // unchanged, any per-session data is safe to keep, even if it's dependent on
+  // a specific config.
+  if (new_session && new_session == current_session_)
+    return;
+
+  current_session_ = new_session;
+
+  doh_server_availability_.clear();
+  if (new_session) {
+    doh_server_availability_.insert(
+        doh_server_availability_.begin(),
+        new_session->config().dns_over_https_servers.size(), false);
+  }
 }
 
 bool ResolveContext::IsCurrentSession(const DnsSession* session) const {
