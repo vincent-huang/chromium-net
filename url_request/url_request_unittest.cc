@@ -105,6 +105,7 @@
 #include "net/proxy_resolution/proxy_resolution_service.h"
 #include "net/quic/mock_crypto_client_stream_factory.h"
 #include "net/quic/quic_server_info.h"
+#include "net/socket/read_buffering_stream_socket.h"
 #include "net/socket/socket_test_util.h"
 #include "net/socket/ssl_client_socket.h"
 #include "net/ssl/client_cert_identity_test_util.h"
@@ -114,6 +115,7 @@
 #include "net/ssl/test_ssl_config_service.h"
 #include "net/test/cert_test_util.h"
 #include "net/test/embedded_test_server/embedded_test_server.h"
+#include "net/test/embedded_test_server/embedded_test_server_connection_listener.h"
 #include "net/test/embedded_test_server/http_request.h"
 #include "net/test/embedded_test_server/http_response.h"
 #include "net/test/gtest_util.h"
@@ -11605,6 +11607,35 @@ TEST_F(URLRequestTestHTTP, TestTagging) {
 }
 #endif
 
+namespace {
+
+class ReadBufferingListener
+    : public test_server::EmbeddedTestServerConnectionListener {
+ public:
+  ReadBufferingListener() = default;
+  ~ReadBufferingListener() override = default;
+
+  void BufferNextConnection(int buffer_size) { buffer_size_ = buffer_size; }
+
+  std::unique_ptr<StreamSocket> AcceptedSocket(
+      std::unique_ptr<StreamSocket> socket) override {
+    if (!buffer_size_) {
+      return socket;
+    }
+    auto wrapped =
+        std::make_unique<ReadBufferingStreamSocket>(std::move(socket));
+    wrapped->BufferNextRead(buffer_size_);
+    // Do not buffer subsequent connections, which may be a 0-RTT retry.
+    buffer_size_ = 0;
+    return wrapped;
+  }
+
+  void ReadFromSocket(const StreamSocket& socket, int rv) override {}
+
+ private:
+  int buffer_size_ = 0;
+};
+
 // Provides a response to the 0RTT request indicating whether it was received
 // as early data, sending HTTP_TOO_EARLY if enabled.
 class ZeroRTTResponse : public test_server::BasicHttpResponse {
@@ -11648,6 +11679,8 @@ std::unique_ptr<test_server::HttpResponse> HandleZeroRTTRequest(
   return std::make_unique<ZeroRTTResponse>(zero_rtt, false);
 }
 
+}  // namespace
+
 class HTTPSEarlyDataTest : public TestWithTaskEnvironment {
  public:
   HTTPSEarlyDataTest()
@@ -11674,6 +11707,7 @@ class HTTPSEarlyDataTest : public TestWithTaskEnvironment {
         base::FilePath(FILE_PATH_LITERAL("net/data/ssl")));
     test_server_.RegisterRequestHandler(
         base::BindRepeating(&HandleZeroRTTRequest));
+    test_server_.SetConnectionListener(&listener_);
   }
 
   ~HTTPSEarlyDataTest() override = default;
@@ -11691,27 +11725,25 @@ class HTTPSEarlyDataTest : public TestWithTaskEnvironment {
   TestURLRequestContext context_;
 
   SSLServerConfig ssl_config_;
+  ReadBufferingListener listener_;
   EmbeddedTestServer test_server_;
 };
 
-// Flaky on iOS, CrOS and Linux ASAN and TSAN, crbug.com/1021021
-#if defined(OS_IOS) || defined(OS_CHROMEOS) || \
-    (defined(OS_LINUX) &&                      \
-     (defined(ADDRESS_SANITIZER) || defined(THREAD_SANITIZER)))
-#define MAYBE_TLSEarlyDataTest DISABLED_TLSEarlyDataTest
-#else
-#define MAYBE_TLSEarlyDataTest TLSEarlyDataTest
-#endif
 // TLSEarlyDataTest tests that we handle early data correctly.
-TEST_F(HTTPSEarlyDataTest, MAYBE_TLSEarlyDataTest) {
+TEST_F(HTTPSEarlyDataTest, TLSEarlyDataTest) {
   ASSERT_TRUE(test_server_.Start());
   context_.http_transaction_factory()->GetSession()->ClearSSLSessionCache();
+
+  // kParamSize must be larger than any ClientHello sent by the client, but
+  // smaller than the maximum amount of early data allowed by the server.
+  const int kParamSize = 4 * 1024;
+  const GURL kUrl =
+      test_server_.GetURL("/zerortt?" + std::string(kParamSize, 'a'));
 
   {
     TestDelegate d;
     std::unique_ptr<URLRequest> r(context_.CreateRequest(
-        test_server_.GetURL("/zerortt"), DEFAULT_PRIORITY, &d,
-        TRAFFIC_ANNOTATION_FOR_TESTS));
+        kUrl, DEFAULT_PRIORITY, &d, TRAFFIC_ANNOTATION_FOR_TESTS));
     r->Start();
     EXPECT_TRUE(r->is_pending());
 
@@ -11732,11 +11764,22 @@ TEST_F(HTTPSEarlyDataTest, MAYBE_TLSEarlyDataTest) {
 
   context_.http_transaction_factory()->GetSession()->CloseAllConnections();
 
+  // 0-RTT inherently involves a race condition: if the server responds with the
+  // ServerHello before the client sends the HTTP request (the client may be
+  // busy verifying a certificate), the client will send data over 1-RTT keys
+  // rather than 0-RTT.
+  //
+  // This test ensures 0-RTT is sent if relevant by making the test server wait
+  // for both the ClientHello and 0-RTT HTTP request before responding. We use
+  // a ReadBufferingStreamSocket and enable buffering for the 0-RTT request. The
+  // buffer size must be larger than the ClientHello but smaller than the
+  // ClientHello combined with the HTTP request.
+  listener_.BufferNextConnection(kParamSize);
+
   {
     TestDelegate d;
     std::unique_ptr<URLRequest> r(context_.CreateRequest(
-        test_server_.GetURL("/zerortt"), DEFAULT_PRIORITY, &d,
-        TRAFFIC_ANNOTATION_FOR_TESTS));
+        kUrl, DEFAULT_PRIORITY, &d, TRAFFIC_ANNOTATION_FOR_TESTS));
 
     r->Start();
     EXPECT_TRUE(r->is_pending());
@@ -11824,26 +11867,24 @@ std::unique_ptr<test_server::HttpResponse> HandleTooEarly(
   return std::make_unique<ZeroRTTResponse>(zero_rtt, true);
 }
 
-// Flaky on iOS, crbug.com/1021021
-#if defined(OS_IOS)
-#define MAYBE_TLSEarlyDataTooEarlyTest DISABLED_TLSEarlyDataTooEarlyTest
-#else
-#define MAYBE_TLSEarlyDataTooEarlyTest TLSEarlyDataTooEarlyTest
-#endif
-
 // Test that we handle 425 (Too Early) correctly.
-TEST_F(HTTPSEarlyDataTest, MAYBE_TLSEarlyDataTooEarlyTest) {
+TEST_F(HTTPSEarlyDataTest, TLSEarlyDataTooEarlyTest) {
   bool sent_425 = false;
   test_server_.RegisterRequestHandler(
       base::BindRepeating(&HandleTooEarly, base::Unretained(&sent_425)));
   ASSERT_TRUE(test_server_.Start());
   context_.http_transaction_factory()->GetSession()->ClearSSLSessionCache();
 
+  // kParamSize must be larger than any ClientHello sent by the client, but
+  // smaller than the maximum amount of early data allowed by the server.
+  const int kParamSize = 4 * 1024;
+  const GURL kUrl =
+      test_server_.GetURL("/tooearly?" + std::string(kParamSize, 'a'));
+
   {
     TestDelegate d;
     std::unique_ptr<URLRequest> r(context_.CreateRequest(
-        test_server_.GetURL("/tooearly"), DEFAULT_PRIORITY, &d,
-        TRAFFIC_ANNOTATION_FOR_TESTS));
+        kUrl, DEFAULT_PRIORITY, &d, TRAFFIC_ANNOTATION_FOR_TESTS));
     r->Start();
     EXPECT_TRUE(r->is_pending());
 
@@ -11865,11 +11906,25 @@ TEST_F(HTTPSEarlyDataTest, MAYBE_TLSEarlyDataTooEarlyTest) {
 
   context_.http_transaction_factory()->GetSession()->CloseAllConnections();
 
+  // 0-RTT inherently involves a race condition: if the server responds with the
+  // ServerHello before the client sends the HTTP request (the client may be
+  // busy verifying a certificate), the client will send data over 1-RTT keys
+  // rather than 0-RTT.
+  //
+  // This test ensures 0-RTT is sent if relevant by making the test server wait
+  // for both the ClientHello and 0-RTT HTTP request before responding. We use
+  // a ReadBufferingStreamSocket and enable buffering for the 0-RTT request. The
+  // buffer size must be larger than the ClientHello but smaller than the
+  // ClientHello combined with the HTTP request.
+  //
+  // We must buffer exactly one connection because the HTTP 425 response will
+  // trigger a retry, potentially on a new connection.
+  listener_.BufferNextConnection(kParamSize);
+
   {
     TestDelegate d;
     std::unique_ptr<URLRequest> r(context_.CreateRequest(
-        test_server_.GetURL("/tooearly"), DEFAULT_PRIORITY, &d,
-        TRAFFIC_ANNOTATION_FOR_TESTS));
+        kUrl, DEFAULT_PRIORITY, &d, TRAFFIC_ANNOTATION_FOR_TESTS));
 
     r->Start();
     EXPECT_TRUE(r->is_pending());
