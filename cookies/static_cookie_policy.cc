@@ -2,26 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "net/base/static_cookie_policy.h"
+#include "net/cookies/static_cookie_policy.h"
 
 #include "base/logging.h"
 #include "net/base/net_errors.h"
-#include "net/base/registry_controlled_domains/registry_controlled_domain.h"
+#include "net/cookies/site_for_cookies.h"
 #include "url/gurl.h"
 
 namespace net {
 
-int StaticCookiePolicy::CanAccessCookies(const GURL& url,
-                                         const GURL& site_for_cookies) const {
+int StaticCookiePolicy::CanAccessCookies(
+    const GURL& url,
+    const net::SiteForCookies& site_for_cookies) const {
   switch (type_) {
     case StaticCookiePolicy::ALLOW_ALL_COOKIES:
       return OK;
     case StaticCookiePolicy::BLOCK_ALL_THIRD_PARTY_COOKIES:
-      return registry_controlled_domains::SameDomainOrHost(
-                 url, site_for_cookies,
-                 registry_controlled_domains::INCLUDE_PRIVATE_REGISTRIES)
-                 ? OK
-                 : ERR_ACCESS_DENIED;
+      return site_for_cookies.IsFirstParty(url) ? OK : ERR_ACCESS_DENIED;
     case StaticCookiePolicy::BLOCK_ALL_COOKIES:
       return ERR_ACCESS_DENIED;
     default:

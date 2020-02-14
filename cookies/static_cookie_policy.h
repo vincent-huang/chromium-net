@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef NET_BASE_STATIC_COOKIE_POLICY_H_
-#define NET_BASE_STATIC_COOKIE_POLICY_H_
+#ifndef NET_COOKIES_STATIC_COOKIE_POLICY_H_
+#define NET_COOKIES_STATIC_COOKIE_POLICY_H_
 
 #include "base/macros.h"
 #include "net/base/net_export.h"
@@ -11,6 +11,8 @@
 class GURL;
 
 namespace net {
+
+class SiteForCookies;
 
 // The StaticCookiePolicy class implements a static cookie policy that supports
 // three modes: allow all, deny all, or block third-party cookies.
@@ -27,13 +29,9 @@ class NET_EXPORT StaticCookiePolicy {
     BLOCK_ALL_THIRD_PARTY_COOKIES
   };
 
-  StaticCookiePolicy()
-      : type_(StaticCookiePolicy::ALLOW_ALL_COOKIES) {
-  }
+  StaticCookiePolicy() : type_(StaticCookiePolicy::ALLOW_ALL_COOKIES) {}
 
-  explicit StaticCookiePolicy(Type type)
-      : type_(type) {
-  }
+  explicit StaticCookiePolicy(Type type) : type_(type) {}
 
   // Sets the current policy to enforce. This should be called when the user's
   // preferences change.
@@ -42,7 +40,8 @@ class NET_EXPORT StaticCookiePolicy {
 
   // Consults the user's third-party cookie blocking preferences to determine
   // whether the URL's cookies can be accessed (i.e., can be get or set).
-  int CanAccessCookies(const GURL& url, const GURL& site_for_cookies) const;
+  int CanAccessCookies(const GURL& url,
+                       const net::SiteForCookies& site_for_cookies) const;
 
  private:
   Type type_;
@@ -52,4 +51,4 @@ class NET_EXPORT StaticCookiePolicy {
 
 }  // namespace net
 
-#endif  // NET_BASE_STATIC_COOKIE_POLICY_H_
+#endif  // NET_COOKIES_STATIC_COOKIE_POLICY_H_
