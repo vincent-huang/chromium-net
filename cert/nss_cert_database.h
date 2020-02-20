@@ -127,9 +127,8 @@ class NET_EXPORT NSSCertDatabase {
   // See https://crbug.com/399554 .
   virtual crypto::ScopedPK11Slot GetSystemSlot() const;
 
-  // Check whether the certificate is stored on the system slot (i.e. is a
-  // device certificate).
-  bool IsCertificateOnSystemSlot(CERTCertificate* cert) const;
+  // Checks whether |cert| is stored on |slot|.
+  static bool IsCertificateOnSlot(CERTCertificate* cert, PK11SlotInfo* slot);
 #endif
 
   // Get the default slot for public key data.
@@ -204,15 +203,6 @@ class NET_EXPORT NSSCertDatabase {
   // Get trust bits for certificate.
   TrustBits GetCertTrust(const CERTCertificate* cert, CertType type) const;
 
-  // IsUntrusted returns true if |cert| is specifically untrusted. These
-  // certificates are stored in the database for the specific purpose of
-  // rejecting them.
-  bool IsUntrusted(const CERTCertificate* cert) const;
-
-  // IsWebTrustAnchor returns true if |cert| is explicitly trusted for web
-  // navigations according to the trust bits stored in the database.
-  bool IsWebTrustAnchor(const CERTCertificate* cert) const;
-
   // Set trust values for certificate.
   // Returns true on success or false on failure.
   bool SetCertTrust(CERTCertificate* cert, CertType type, TrustBits trust_bits);
@@ -228,11 +218,20 @@ class NET_EXPORT NSSCertDatabase {
   void DeleteCertAndKeyAsync(ScopedCERTCertificate cert,
                              DeleteCertCallback callback);
 
+  // IsUntrusted returns true if |cert| is specifically untrusted. These
+  // certificates are stored in the database for the specific purpose of
+  // rejecting them.
+  static bool IsUntrusted(const CERTCertificate* cert);
+
+  // IsWebTrustAnchor returns true if |cert| is explicitly trusted for web
+  // navigations according to the trust bits stored in the database.
+  static bool IsWebTrustAnchor(const CERTCertificate* cert);
+
   // Check whether cert is stored in a readonly slot.
-  bool IsReadOnly(const CERTCertificate* cert) const;
+  static bool IsReadOnly(const CERTCertificate* cert);
 
   // Check whether cert is stored in a hardware slot.
-  bool IsHardwareBacked(const CERTCertificate* cert) const;
+  static bool IsHardwareBacked(const CERTCertificate* cert);
 
  protected:
   // Certificate listing implementation used by |ListCerts*|. Static so it may

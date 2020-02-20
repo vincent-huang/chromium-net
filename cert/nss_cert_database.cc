@@ -108,13 +108,13 @@ crypto::ScopedPK11Slot NSSCertDatabase::GetSystemSlot() const {
   return crypto::ScopedPK11Slot();
 }
 
-bool NSSCertDatabase::IsCertificateOnSystemSlot(CERTCertificate* cert) const {
-  crypto::ScopedPK11Slot system_slot = GetSystemSlot();
-  if (!system_slot)
+// static
+bool NSSCertDatabase::IsCertificateOnSlot(CERTCertificate* cert,
+                                          PK11SlotInfo* slot) {
+  if (!slot)
     return false;
 
-  return PK11_FindCertInSlot(system_slot.get(), cert, nullptr) !=
-         CK_INVALID_HANDLE;
+  return PK11_FindCertInSlot(slot, cert, nullptr) != CK_INVALID_HANDLE;
 }
 #endif
 
@@ -299,7 +299,37 @@ NSSCertDatabase::TrustBits NSSCertDatabase::GetCertTrust(
   }
 }
 
-bool NSSCertDatabase::IsUntrusted(const CERTCertificate* cert) const {
+bool NSSCertDatabase::SetCertTrust(CERTCertificate* cert,
+                                   CertType type,
+                                   TrustBits trust_bits) {
+  bool success = psm::SetCertTrust(cert, type, trust_bits);
+  if (success)
+    NotifyObserversCertDBChanged();
+
+  return success;
+}
+
+bool NSSCertDatabase::DeleteCertAndKey(CERTCertificate* cert) {
+  if (!DeleteCertAndKeyImpl(cert))
+    return false;
+  NotifyObserversCertDBChanged();
+  return true;
+}
+
+void NSSCertDatabase::DeleteCertAndKeyAsync(ScopedCERTCertificate cert,
+                                            DeleteCertCallback callback) {
+  base::PostTaskAndReplyWithResult(
+      FROM_HERE,
+      {base::ThreadPool(), base::MayBlock(),
+       base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN},
+      base::BindOnce(&NSSCertDatabase::DeleteCertAndKeyImplScoped,
+                     std::move(cert)),
+      base::BindOnce(&NSSCertDatabase::NotifyCertRemovalAndCallBack,
+                     weak_factory_.GetWeakPtr(), std::move(callback)));
+}
+
+// static
+bool NSSCertDatabase::IsUntrusted(const CERTCertificate* cert) {
   CERTCertTrust nsstrust;
   SECStatus rv = CERT_GetCertTrust(cert, &nsstrust);
   if (rv != SECSuccess) {
@@ -351,7 +381,8 @@ bool NSSCertDatabase::IsUntrusted(const CERTCertificate* cert) const {
   return false;
 }
 
-bool NSSCertDatabase::IsWebTrustAnchor(const CERTCertificate* cert) const {
+// static
+bool NSSCertDatabase::IsWebTrustAnchor(const CERTCertificate* cert) {
   CERTCertTrust nsstrust;
   SECStatus rv = CERT_GetCertTrust(cert, &nsstrust);
   if (rv != SECSuccess) {
@@ -371,41 +402,14 @@ bool NSSCertDatabase::IsWebTrustAnchor(const CERTCertificate* cert) const {
   return false;
 }
 
-bool NSSCertDatabase::SetCertTrust(CERTCertificate* cert,
-                                   CertType type,
-                                   TrustBits trust_bits) {
-  bool success = psm::SetCertTrust(cert, type, trust_bits);
-  if (success)
-    NotifyObserversCertDBChanged();
-
-  return success;
-}
-
-bool NSSCertDatabase::DeleteCertAndKey(CERTCertificate* cert) {
-  if (!DeleteCertAndKeyImpl(cert))
-    return false;
-  NotifyObserversCertDBChanged();
-  return true;
-}
-
-void NSSCertDatabase::DeleteCertAndKeyAsync(ScopedCERTCertificate cert,
-                                            DeleteCertCallback callback) {
-  base::PostTaskAndReplyWithResult(
-      FROM_HERE,
-      {base::ThreadPool(), base::MayBlock(),
-       base::TaskShutdownBehavior::CONTINUE_ON_SHUTDOWN},
-      base::BindOnce(&NSSCertDatabase::DeleteCertAndKeyImplScoped,
-                     std::move(cert)),
-      base::BindOnce(&NSSCertDatabase::NotifyCertRemovalAndCallBack,
-                     weak_factory_.GetWeakPtr(), std::move(callback)));
-}
-
-bool NSSCertDatabase::IsReadOnly(const CERTCertificate* cert) const {
+// static
+bool NSSCertDatabase::IsReadOnly(const CERTCertificate* cert) {
   PK11SlotInfo* slot = cert->slot;
   return slot && PK11_IsReadOnly(slot);
 }
 
-bool NSSCertDatabase::IsHardwareBacked(const CERTCertificate* cert) const {
+// static
+bool NSSCertDatabase::IsHardwareBacked(const CERTCertificate* cert) {
   PK11SlotInfo* slot = cert->slot;
   return slot && PK11_IsHW(slot);
 }
