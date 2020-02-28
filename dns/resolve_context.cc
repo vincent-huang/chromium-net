@@ -89,10 +89,6 @@ struct ResolveContext::ServerStats {
   // Count of consecutive failures after last success.
   int last_failure_count;
 
-  // True if any success has ever been recorded for this server for the current
-  // connection.
-  bool current_connection_success = false;
-
   // Last time when server returned failure or timeout.
   base::TimeTicks last_failure;
   // Last time when server returned success.
@@ -176,17 +172,17 @@ base::Optional<size_t> ResolveContext::DohServerIndexToUse(
   if (!IsCurrentSession(session))
     return base::nullopt;
 
-  CHECK_LT(starting_doh_server_index, doh_server_stats_.size());
+  CHECK_LT(starting_doh_server_index, doh_server_availability_.size());
   size_t index = starting_doh_server_index;
   base::TimeTicks oldest_server_failure;
   base::Optional<size_t> oldest_available_server_failure_index;
 
   do {
-    CHECK_LT(index, doh_server_stats_.size());
+    CHECK_LT(index, doh_server_availability_.size());
     // For a server to be considered "available", the server must have a
     // successful probe status if we are in AUTOMATIC mode.
     if (secure_dns_mode == DnsConfig::SecureDnsMode::SECURE ||
-        GetDohServerAvailability(index, session)) {
+        doh_server_availability_[index]) {
       // If number of failures on this server doesn't exceed |config_.attempts|,
       // return its index. |config_.attempts| will generally be more restrictive
       // than |kAutomaticModeFailureLimit|, although this is not guaranteed.
@@ -213,21 +209,41 @@ base::Optional<size_t> ResolveContext::DohServerIndexToUse(
   return oldest_available_server_failure_index;
 }
 
+size_t ResolveContext::NumAvailableDohServers(const DnsSession* session) const {
+  if (!IsCurrentSession(session))
+    return 0;
+
+  size_t count = 0;
+  for (const auto& probe_result : doh_server_availability_) {
+    if (probe_result)
+      count++;
+  }
+  return count;
+}
+
 bool ResolveContext::GetDohServerAvailability(size_t doh_server_index,
                                               const DnsSession* session) const {
   if (!IsCurrentSession(session))
     return false;
 
-  CHECK_LT(doh_server_index, doh_server_stats_.size());
-  return ServerStatsToDohAvailability(doh_server_stats_[doh_server_index]);
+  CHECK_LT(doh_server_index, doh_server_availability_.size());
+  return doh_server_availability_[doh_server_index];
 }
 
-size_t ResolveContext::NumAvailableDohServers(const DnsSession* session) const {
+void ResolveContext::SetProbeSuccess(size_t doh_server_index,
+                                     bool success,
+                                     const DnsSession* session) {
   if (!IsCurrentSession(session))
-    return 0;
+    return;
 
-  return std::count_if(doh_server_stats_.cbegin(), doh_server_stats_.cend(),
-                       &ServerStatsToDohAvailability);
+  bool doh_available_before = NumAvailableDohServers(session) > 0;
+  CHECK_LT(doh_server_index, doh_server_availability_.size());
+  doh_server_availability_[doh_server_index] = success;
+
+  // TODO(crbug.com/1022059): Consider figuring out some way to only for the
+  // first context enabling DoH or the last context disabling DoH.
+  if (doh_available_before != NumAvailableDohServers(session) > 0)
+    NetworkChangeNotifier::TriggerNonSystemDnsChange();
 }
 
 void ResolveContext::RecordServerFailure(size_t server_index,
@@ -236,17 +252,14 @@ void ResolveContext::RecordServerFailure(size_t server_index,
   if (!IsCurrentSession(session))
     return;
 
-  bool doh_available_before = NumAvailableDohServers(session) > 0;
-
   ServerStats* stats = GetServerStats(server_index, is_doh_server);
   ++(stats->last_failure_count);
   stats->last_failure = base::TimeTicks::Now();
 
-  // TODO(crbug.com/1022059): Consider figuring out some way to only for the
-  // first context enabling DoH or the last context disabling DoH.
-  bool doh_available_now = NumAvailableDohServers(session) > 0;
-  if (doh_available_before != doh_available_now)
-    NetworkChangeNotifier::TriggerNonSystemDnsChange();
+  if (is_doh_server &&
+      stats->last_failure_count >= kAutomaticModeFailureLimit) {
+    SetProbeSuccess(server_index, false /* success */, session);
+  }
 }
 
 void ResolveContext::RecordServerSuccess(size_t server_index,
@@ -255,19 +268,15 @@ void ResolveContext::RecordServerSuccess(size_t server_index,
   if (!IsCurrentSession(session))
     return;
 
-  bool doh_available_before = NumAvailableDohServers(session) > 0;
-
   ServerStats* stats = GetServerStats(server_index, is_doh_server);
-  stats->last_failure_count = 0;
-  stats->current_connection_success = true;
+
+  // DoH queries can be sent using more than one URLRequestContext. A success
+  // from one URLRequestContext shouldn't zero out failures that may be
+  // consistently occurring for another URLRequestContext.
+  if (!is_doh_server)
+    stats->last_failure_count = 0;
   stats->last_failure = base::TimeTicks();
   stats->last_success = base::TimeTicks::Now();
-
-  // TODO(crbug.com/1022059): Consider figuring out some way to only for the
-  // first context enabling DoH or the last context disabling DoH.
-  bool doh_available_now = NumAvailableDohServers(session) > 0;
-  if (doh_available_before != doh_available_now)
-    NetworkChangeNotifier::TriggerNonSystemDnsChange();
 }
 
 void ResolveContext::RecordRtt(size_t server_index,
@@ -278,7 +287,7 @@ void ResolveContext::RecordRtt(size_t server_index,
   if (!IsCurrentSession(session))
     return;
 
-  RecordRttForUma(server_index, is_doh_server, rtt, rv, session);
+  RecordRttForUma(server_index, is_doh_server, rtt, rv);
 
   ServerStats* stats = GetServerStats(server_index, is_doh_server);
 
@@ -327,6 +336,7 @@ void ResolveContext::InvalidateCaches(const DnsSession* new_session) {
   current_session_.reset();
   classic_server_stats_.clear();
   doh_server_stats_.clear();
+  doh_server_availability_.clear();
   initial_timeout_ = base::TimeDelta();
 
   if (!new_session)
@@ -343,11 +353,16 @@ void ResolveContext::InvalidateCaches(const DnsSession* new_session) {
        ++i) {
     doh_server_stats_.emplace_back(initial_timeout_, GetRttBuckets());
   }
+  doh_server_availability_.insert(
+      doh_server_availability_.begin(),
+      new_session->config().dns_over_https_servers.size(), false);
 
   CHECK_EQ(new_session->config().nameservers.size(),
            classic_server_stats_.size());
   CHECK_EQ(new_session->config().dns_over_https_servers.size(),
            doh_server_stats_.size());
+  CHECK_EQ(new_session->config().dns_over_https_servers.size(),
+           doh_server_availability_.size());
 }
 
 bool ResolveContext::IsCurrentSession(const DnsSession* session) const {
@@ -357,6 +372,8 @@ bool ResolveContext::IsCurrentSession(const DnsSession* session) const {
              classic_server_stats_.size());
     CHECK_EQ(current_session_->config().dns_over_https_servers.size(),
              doh_server_stats_.size());
+    CHECK_EQ(doh_server_availability_.size(),
+             current_session_->config().dns_over_https_servers.size());
     return true;
   }
 
@@ -406,15 +423,15 @@ base::TimeDelta ResolveContext::NextTimeoutHelper(ServerStats* server_stats,
 void ResolveContext::RecordRttForUma(size_t server_index,
                                      bool is_doh_server,
                                      base::TimeDelta rtt,
-                                     int rv,
-                                     const DnsSession* session) {
-  DCHECK(IsCurrentSession(session));
+                                     int rv) {
+  DCHECK(current_session_);
 
   std::string query_type;
   std::string provider_id;
   if (is_doh_server) {
     // Secure queries are validated if the DoH server state is available.
-    if (GetDohServerAvailability(server_index, session))
+    CHECK_LT(server_index, doh_server_availability_.size());
+    if (doh_server_availability_[server_index])
       query_type = "SecureValidated";
     else
       query_type = "SecureNotValidated";
@@ -446,31 +463,10 @@ void ResolveContext::RecordRttForUma(size_t server_index,
 
 void ResolveContext::OnNetworkChanged(
     NetworkChangeNotifier::ConnectionType type) {
-  // Reset per-connection state on CONNECTION_NONE notifications (which are
-  // always sent before the new connection type on changes). Resetting this
-  // state is a "destructive" activity (see
-  // NetworkChangeObserver::OnNetworkChanged()), and it's also important that
-  // this reset occurs before probes are restarted on non-CONNECTION_NONE
-  // notifications.
-  if (type != NetworkChangeNotifier::CONNECTION_NONE)
-    return;
-
-  if (current_session_) {
+  if (current_session_)
     initial_timeout_ = GetDefaultTimeout(current_session_->config());
-    for (ServerStats& classic_server_stat : classic_server_stats_)
-      classic_server_stat.current_connection_success = false;
-    for (ServerStats& doh_server_stat : doh_server_stats_)
-      doh_server_stat.current_connection_success = false;
-  }
 
   max_timeout_ = GetMaxTimeout();
-}
-
-// static
-bool ResolveContext::ServerStatsToDohAvailability(
-    const ResolveContext::ServerStats& stats) {
-  return stats.last_failure_count < kAutomaticModeFailureLimit &&
-         stats.current_connection_success;
 }
 
 }  // namespace net
