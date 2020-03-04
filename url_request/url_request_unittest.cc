@@ -9589,6 +9589,22 @@ static const SHA256HashValue kOCSPTestCertSPKI = {{
 // generates.
 static const char kOCSPTestCertPolicy[] = "1.3.6.1.4.1.11129.2.4.1";
 
+// Interceptor to check that secure DNS has been disabled.
+class SecureDnsInterceptor : public net::URLRequestInterceptor {
+ public:
+  SecureDnsInterceptor() = default;
+  ~SecureDnsInterceptor() override = default;
+
+ private:
+  // URLRequestInterceptor implementation:
+  net::URLRequestJob* MaybeInterceptRequest(
+      net::URLRequest* request,
+      net::NetworkDelegate* network_delegate) const override {
+    EXPECT_TRUE(request->disable_secure_dns());
+    return nullptr;
+  }
+};
+
 class HTTPSOCSPTest : public HTTPSRequestTest {
  public:
   HTTPSOCSPTest()
@@ -9609,6 +9625,9 @@ class HTTPSOCSPTest : public HTTPSRequestTest {
     cert_net_fetcher_->SetURLRequestContext(&context_);
     context_.cert_verifier()->SetConfig(GetCertVerifierConfig());
 
+    net::URLRequestFilter::GetInstance()->AddHostnameInterceptor(
+        "http", "127.0.0.1", std::make_unique<SecureDnsInterceptor>());
+
     scoped_refptr<X509Certificate> root_cert =
         ImportCertFromFile(GetTestCertsDirectory(), "ocsp-test-root.pem");
     ASSERT_TRUE(root_cert);
@@ -9617,6 +9636,10 @@ class HTTPSOCSPTest : public HTTPSRequestTest {
 #if defined(USE_NSS_CERTS)
     SetURLRequestContextForNSSHttpIO(&context_);
 #endif
+  }
+
+  void TearDown() override {
+    net::URLRequestFilter::GetInstance()->ClearHandlers();
   }
 
   void DoConnectionWithDelegate(
