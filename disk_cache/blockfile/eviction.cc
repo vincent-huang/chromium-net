@@ -46,7 +46,6 @@
 #include "net/disk_cache/blockfile/entry_impl.h"
 #include "net/disk_cache/blockfile/experiments.h"
 #include "net/disk_cache/blockfile/histogram_macros.h"
-#include "net/disk_cache/blockfile/trace.h"
 
 // Provide a BackendImpl object to macros from histogram_macros.h.
 #define CACHE_UMA_BACKEND_IMPL_OBJ backend_
@@ -122,7 +121,6 @@ void Eviction::TrimCache(bool empty) {
   if (new_eviction_)
     return TrimCacheV2(empty);
 
-  Trace("*** Trim Cache ***");
   trimming_ = true;
   TimeTicks start = TimeTicks::Now();
   Rankings::ScopedRankingsBlock node(rankings_);
@@ -163,7 +161,6 @@ void Eviction::TrimCache(bool empty) {
   CACHE_UMA(COUNTS, "TrimItemsV1", 0, deleted_entries);
 
   trimming_ = false;
-  Trace("*** Trim Cache end ***");
   return;
 }
 
@@ -284,10 +281,8 @@ Rankings::List Eviction::GetListForEntry(EntryImpl* entry) {
 bool Eviction::EvictEntry(CacheRankingsBlock* node, bool empty,
                           Rankings::List list) {
   scoped_refptr<EntryImpl> entry = backend_->GetEnumeratedEntry(node, list);
-  if (!entry) {
-    Trace("NewEntry failed on Trim 0x%x", node->address().value());
+  if (!entry)
     return false;
-  }
 
   ReportTrimTimes(entry.get());
   if (empty || !new_eviction_) {
@@ -311,7 +306,6 @@ bool Eviction::EvictEntry(CacheRankingsBlock* node, bool empty,
 // -----------------------------------------------------------------------
 
 void Eviction::TrimCacheV2(bool empty) {
-  Trace("*** Trim Cache ***");
   trimming_ = true;
   TimeTicks start = TimeTicks::Now();
 
@@ -389,7 +383,6 @@ void Eviction::TrimCacheV2(bool empty) {
   }
   CACHE_UMA(COUNTS, "TrimItemsV2", 0, deleted_entries);
 
-  Trace("*** Trim Cache end ***");
   trimming_ = false;
   return;
 }
@@ -489,7 +482,6 @@ Rankings::List Eviction::GetListForEntryV2(EntryImpl* entry) {
 // This is a minimal implementation that just discards the oldest nodes.
 // TODO(rvargas): Do something better here.
 void Eviction::TrimDeleted(bool empty) {
-  Trace("*** Trim Deleted ***");
   if (backend_->disabled_)
     return;
 
@@ -517,17 +509,14 @@ void Eviction::TrimDeleted(bool empty) {
 
   CACHE_UMA(AGE_MS, "TotalTrimDeletedTime", 0, start);
   CACHE_UMA(COUNTS, "TrimDeletedItems", 0, deleted_entries);
-  Trace("*** Trim Deleted end ***");
   return;
 }
 
 bool Eviction::RemoveDeletedNode(CacheRankingsBlock* node) {
   scoped_refptr<EntryImpl> entry =
       backend_->GetEnumeratedEntry(node, Rankings::DELETED);
-  if (!entry) {
-    Trace("NewEntry failed on Trim 0x%x", node->address().value());
+  if (!entry)
     return false;
-  }
 
   bool doomed = (entry->entry()->Data()->state == ENTRY_DOOMED);
   entry->entry()->Data()->state = ENTRY_DOOMED;
