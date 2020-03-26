@@ -41,6 +41,7 @@
 #include "base/strings/string_util.h"
 #include "base/threading/thread_task_runner_handle.h"
 #include "base/time/time.h"
+#include "base/trace_event/trace_event.h"
 #include "net/disk_cache/blockfile/backend_impl.h"
 #include "net/disk_cache/blockfile/disk_format.h"
 #include "net/disk_cache/blockfile/entry_impl.h"
@@ -112,6 +113,7 @@ void Eviction::Stop() {
 }
 
 void Eviction::TrimCache(bool empty) {
+  TRACE_EVENT0("disk_cache", "Eviction::TrimCache");
   if (backend_->disabled_ || trimming_)
     return;
 
@@ -203,6 +205,8 @@ void Eviction::SetTestMode() {
 }
 
 void Eviction::TrimDeletedList(bool empty) {
+  TRACE_EVENT0("disk_cache", "Eviction::TrimDeletedList");
+
   DCHECK(test_mode_ && new_eviction_);
   TrimDeleted(empty);
 }
@@ -306,6 +310,8 @@ bool Eviction::EvictEntry(CacheRankingsBlock* node, bool empty,
 // -----------------------------------------------------------------------
 
 void Eviction::TrimCacheV2(bool empty) {
+  TRACE_EVENT0("disk_cache", "Eviction::TrimCacheV2");
+
   trimming_ = true;
   TimeTicks start = TimeTicks::Now();
 
@@ -482,6 +488,8 @@ Rankings::List Eviction::GetListForEntryV2(EntryImpl* entry) {
 // This is a minimal implementation that just discards the oldest nodes.
 // TODO(rvargas): Do something better here.
 void Eviction::TrimDeleted(bool empty) {
+  TRACE_EVENT0("disk_cache", "Eviction::TrimDeleted");
+
   if (backend_->disabled_)
     return;
 

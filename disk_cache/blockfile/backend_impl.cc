@@ -31,6 +31,7 @@
 #include "base/time/time.h"
 #include "base/timer/timer.h"
 #include "base/trace_event/process_memory_dump.h"
+#include "base/trace_event/trace_event.h"
 #include "net/base/net_errors.h"
 #include "net/disk_cache/backend_cleanup_tracker.h"
 #include "net/disk_cache/blockfile/disk_format.h"
@@ -172,7 +173,9 @@ BackendImpl::BackendImpl(
       consider_evicting_at_op_end_(false),
       net_log_(net_log),
       done_(base::WaitableEvent::ResetPolicy::MANUAL,
-            base::WaitableEvent::InitialState::NOT_SIGNALED) {}
+            base::WaitableEvent::InitialState::NOT_SIGNALED) {
+  TRACE_EVENT0("disk_cache", "BackendImpl::BackendImpl");
+}
 
 BackendImpl::BackendImpl(
     const base::FilePath& path,
@@ -200,9 +203,12 @@ BackendImpl::BackendImpl(
       consider_evicting_at_op_end_(false),
       net_log_(net_log),
       done_(base::WaitableEvent::ResetPolicy::MANUAL,
-            base::WaitableEvent::InitialState::NOT_SIGNALED) {}
+            base::WaitableEvent::InitialState::NOT_SIGNALED) {
+  TRACE_EVENT0("disk_cache", "BackendImpl::BackendImpl");
+}
 
 BackendImpl::~BackendImpl() {
+  TRACE_EVENT0("disk_cache", "BackendImpl::~BackendImpl");
   if (user_flags_ & kNoRandom) {
     // This is a unit test, so we want to be strict about not leaking entries
     // and completing all the work.
@@ -232,6 +238,8 @@ net::Error BackendImpl::Init(CompletionOnceCallback callback) {
 }
 
 int BackendImpl::SyncInit() {
+  TRACE_EVENT0("disk_cache", "BackendImpl::SyncInit");
+
 #if defined(NET_BUILD_STRESS_CACHE)
   // Start evictions right away.
   up_ticks_ = kTrimDelay * 2;
@@ -342,6 +350,8 @@ int BackendImpl::SyncInit() {
 
 void BackendImpl::CleanupCache() {
   DCHECK(background_queue_.BackgroundIsCurrentSequence());
+  TRACE_EVENT0("disk_cache", "BackendImpl::CleanupCache");
+
   eviction_.Stop();
   timer_.reset();
 
@@ -414,6 +424,8 @@ int BackendImpl::SyncDoomAllEntries() {
 
 int BackendImpl::SyncDoomEntriesBetween(const base::Time initial_time,
                                         const base::Time end_time) {
+  TRACE_EVENT0("disk_cache", "BackendImpl::SyncDoomEntriesBetween");
+
   DCHECK_NE(net::APP_CACHE, GetCacheType());
   if (end_time.is_null())
     return SyncDoomEntriesSince(initial_time);
@@ -446,6 +458,8 @@ int BackendImpl::SyncDoomEntriesBetween(const base::Time initial_time,
 }
 
 int BackendImpl::SyncCalculateSizeOfAllEntries() {
+  TRACE_EVENT0("disk_cache", "BackendImpl::SyncCalculateSizeOfAllEntries");
+
   DCHECK_NE(net::APP_CACHE, GetCacheType());
   if (disabled_)
     return net::ERR_FAILED;
@@ -456,6 +470,8 @@ int BackendImpl::SyncCalculateSizeOfAllEntries() {
 // We use OpenNextEntryImpl to retrieve elements from the cache, until we get
 // entries that are too old.
 int BackendImpl::SyncDoomEntriesSince(const base::Time initial_time) {
+  TRACE_EVENT0("disk_cache", "BackendImpl::SyncDoomEntriesSince");
+
   DCHECK_NE(net::APP_CACHE, GetCacheType());
   if (disabled_)
     return net::ERR_FAILED;
@@ -482,6 +498,8 @@ int BackendImpl::SyncDoomEntriesSince(const base::Time initial_time) {
 
 int BackendImpl::SyncOpenNextEntry(Rankings::Iterator* iterator,
                                    scoped_refptr<EntryImpl>* next_entry) {
+  TRACE_EVENT0("disk_cache", "BackendImpl::SyncOpenNextEntry");
+
   *next_entry = OpenNextEntryImpl(iterator);
   return (*next_entry) ? net::OK : net::ERR_FAILED;
 }
@@ -504,6 +522,8 @@ void BackendImpl::SyncOnExternalCacheHit(const std::string& key) {
 }
 
 scoped_refptr<EntryImpl> BackendImpl::OpenEntryImpl(const std::string& key) {
+  TRACE_EVENT0("disk_cache", "BackendImpl::OpenEntryImpl");
+
   if (disabled_)
     return nullptr;
 
@@ -542,6 +562,8 @@ scoped_refptr<EntryImpl> BackendImpl::OpenEntryImpl(const std::string& key) {
 }
 
 scoped_refptr<EntryImpl> BackendImpl::CreateEntryImpl(const std::string& key) {
+  TRACE_EVENT0("disk_cache", "BackendImpl::CreateEntryImpl");
+
   if (disabled_ || key.empty())
     return nullptr;
 
@@ -738,6 +760,7 @@ base::WeakPtr<InFlightBackendIO> BackendImpl::GetBackgroundQueue() {
 }
 
 bool BackendImpl::CreateExternalFile(Addr* address) {
+  TRACE_EVENT0("disk_cache", "BackendImpl::CreateExternalFile");
   int file_number = data_->header.last_file + 1;
   Addr file_address(0);
   bool success = false;
@@ -1513,6 +1536,8 @@ void BackendImpl::StoreStats() {
 }
 
 void BackendImpl::RestartCache(bool failure) {
+  TRACE_EVENT0("disk_cache", "BackendImpl::RestartCache");
+
   int64_t errors = stats_.GetCounter(Stats::FATAL_ERROR);
   int64_t full_dooms = stats_.GetCounter(Stats::DOOM_CACHE);
   int64_t partial_dooms = stats_.GetCounter(Stats::DOOM_RECENT);
@@ -1633,6 +1658,8 @@ scoped_refptr<EntryImpl> BackendImpl::MatchEntry(const std::string& key,
                                                  bool find_parent,
                                                  Addr entry_addr,
                                                  bool* match_error) {
+  TRACE_EVENT0("disk_cache", "BackendImpl::MatchEntry");
+
   Addr address(data_->table[hash & mask_]);
   scoped_refptr<EntryImpl> cache_entry, parent_entry;
   bool found = false;
