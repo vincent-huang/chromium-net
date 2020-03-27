@@ -96,11 +96,12 @@ base::Value CertVerifyResultParams(const CertVerifyResult& verify_result) {
 base::Value CertVerifierParams(const CertVerifier::RequestParams& params) {
   base::Value dict(NetLogX509CertificateParams(params.certificate().get()));
   if (!params.ocsp_response().empty()) {
-    dict.SetStringPath("ocsp_response",
-                       PEMEncode(params.ocsp_response(), "OCSP RESPONSE"));
+    dict.SetStringPath("ocsp_response", PEMEncode(params.ocsp_response(),
+                                                  "NETLOG OCSP RESPONSE"));
   }
   if (!params.sct_list().empty()) {
-    dict.SetStringPath("sct_list", PEMEncode(params.sct_list(), "SCT LIST"));
+    dict.SetStringPath("sct_list",
+                       PEMEncode(params.sct_list(), "NETLOG SCT LIST"));
   }
   dict.SetPath("host", NetLogStringValue(params.hostname()));
   dict.SetIntPath("verifier_flags", params.flags());
