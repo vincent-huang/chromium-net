@@ -2184,6 +2184,15 @@ EVENT_TYPE(QUIC_SESSION_MESSAGE_FRAME_SENT)
 //  }
 EVENT_TYPE(QUIC_SESSION_MESSAGE_FRAME_RECEIVED)
 
+// Session received a HANDSHAKE_DONE frame.
+EVENT_TYPE(QUIC_SESSION_HANDSHAKE_DONE_FRAME_RECEIVED)
+
+// Session sent a coalesced QUIC packet.
+// {
+//   "info": <coalesced packet info>
+// }
+EVENT_TYPE(QUIC_SESSION_COALESCED_PACKET_SENT)
+
 // ------------------------------------------------------------------------
 // QuicHttpStream
 // ------------------------------------------------------------------------
