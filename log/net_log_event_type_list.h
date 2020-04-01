@@ -1812,6 +1812,15 @@ EVENT_TYPE(QUIC_SESSION_STREAM_FRAME_RECEIVED)
 //   }
 EVENT_TYPE(QUIC_SESSION_STREAM_FRAME_SENT)
 
+// A stream frame is coalesced with an existing stream frame.
+//   {
+//     "stream_id": <The id of the stream which this data is for>,
+//     "fin": <True if this is the final data set by the peer on this stream>,
+//     "offset": <Offset in the byte stream where this data starts>,
+//     "length": <Length of the data in this frame>,
+//   }
+EVENT_TYPE(QUIC_SESSION_STREAM_FRAME_COALESCED)
+
 // Session received an ACK frame.
 //   {
 //     "sent_info": <Details of packet sent by the peer>
