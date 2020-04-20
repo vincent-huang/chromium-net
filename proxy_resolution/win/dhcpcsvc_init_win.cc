@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "net/proxy_resolution/dhcpcsvc_init_win.h"
+#include "net/proxy_resolution/win/dhcpcsvc_init_win.h"
 
 #include "base/lazy_instance.h"
 #include "base/logging.h"

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef NET_PROXY_RESOLUTION_PROXY_RESOLVER_WINHTTP_H_
-#define NET_PROXY_RESOLUTION_PROXY_RESOLVER_WINHTTP_H_
+#ifndef NET_PROXY_RESOLUTION_WIN_PROXY_RESOLVER_WINHTTP_H_
+#define NET_PROXY_RESOLUTION_WIN_PROXY_RESOLVER_WINHTTP_H_
 
 #include "base/compiler_specific.h"
 #include "base/macros.h"
@@ -32,4 +32,4 @@ class NET_EXPORT_PRIVATE ProxyResolverFactoryWinHttp
 
 }  // namespace net
 
-#endif  // NET_PROXY_RESOLUTION_PROXY_RESOLVER_WINHTTP_H_
+#endif  // NET_PROXY_RESOLUTION_WIN_PROXY_RESOLVER_WINHTTP_H_

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef NET_PROXY_RESOLUTION_PROXY_CONFIG_SERVICE_WIN_H_
-#define NET_PROXY_RESOLUTION_PROXY_CONFIG_SERVICE_WIN_H_
+#ifndef NET_PROXY_RESOLUTION_WIN_PROXY_CONFIG_SERVICE_WIN_H_
+#define NET_PROXY_RESOLUTION_WIN_PROXY_CONFIG_SERVICE_WIN_H_
 
 #include <windows.h>
 #include <winhttp.h>
@@ -89,4 +89,4 @@ class NET_EXPORT_PRIVATE ProxyConfigServiceWin
 
 }  // namespace net
 
-#endif  // NET_PROXY_RESOLUTION_PROXY_CONFIG_SERVICE_WIN_H_
+#endif  // NET_PROXY_RESOLUTION_WIN_PROXY_CONFIG_SERVICE_WIN_H_

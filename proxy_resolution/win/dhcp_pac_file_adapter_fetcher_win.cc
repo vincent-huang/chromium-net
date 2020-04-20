@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "net/proxy_resolution/dhcp_pac_file_adapter_fetcher_win.h"
+#include "net/proxy_resolution/win/dhcp_pac_file_adapter_fetcher_win.h"
 
 #include "base/bind.h"
 #include "base/bind_helpers.h"
@@ -15,8 +15,8 @@
 #include "base/threading/scoped_blocking_call.h"
 #include "base/time/time.h"
 #include "net/base/net_errors.h"
-#include "net/proxy_resolution/dhcpcsvc_init_win.h"
 #include "net/proxy_resolution/pac_file_fetcher_impl.h"
+#include "net/proxy_resolution/win/dhcpcsvc_init_win.h"
 #include "net/url_request/url_request_context.h"
 
 #include <windows.h>

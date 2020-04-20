@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "net/proxy_resolution/dhcp_pac_file_adapter_fetcher_win.h"
+#include "net/proxy_resolution/win/dhcp_pac_file_adapter_fetcher_win.h"
 
 #include "base/memory/ptr_util.h"
 #include "base/run_loop.h"
@@ -34,7 +34,7 @@ namespace {
 
 const char kPacUrl[] = "http://pacserver/script.pac";
 
-// In net/proxy_resolution/dhcp_pac_file_fetcher_win_unittest.cc there are
+// In dhcp_pac_file_fetcher_win_unittest.cc there are
 // a few tests that exercise DhcpPacFileAdapterFetcher end-to-end along with
 // DhcpPacFileFetcherWin, i.e. it tests the end-to-end usage of Win32 APIs
 // and the network.  In this file we test only by stubbing out functionality.

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "net/proxy_resolution/dhcp_pac_file_fetcher_win.h"
+#include "net/proxy_resolution/win/dhcp_pac_file_fetcher_win.h"
 
 #include <vector>
 
@@ -15,7 +15,7 @@
 #include "base/threading/platform_thread.h"
 #include "base/timer/elapsed_timer.h"
 #include "base/timer/timer.h"
-#include "net/proxy_resolution/dhcp_pac_file_adapter_fetcher_win.h"
+#include "net/proxy_resolution/win/dhcp_pac_file_adapter_fetcher_win.h"
 #include "net/test/gtest_util.h"
 #include "net/traffic_annotation/network_traffic_annotation_test_helper.h"
 #include "net/url_request/url_request_test_util.h"
