@@ -73,8 +73,9 @@ NET_EXPORT GURL CookieOriginToURL(const std::string& domain, bool is_https);
 NET_EXPORT GURL SimulatedCookieSource(const CanonicalCookie& cookie,
                                       const std::string& source_scheme);
 
-// Returns true if the cookie |domain| matches the given |host| as described
-// in section 5.1.3 of RFC 6265.
+// |domain| is the output of cookie.Domain() for some cookie. This returns true
+// if a |domain| indicates that the cookie can be accessed by |host|.
+// See comment on CanonicalCookie::IsDomainMatch().
 NET_EXPORT bool IsDomainMatch(const std::string& domain,
                               const std::string& host);
 
