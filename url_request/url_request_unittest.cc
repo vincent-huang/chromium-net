@@ -10013,9 +10013,10 @@ TEST_F(HTTPSOCSPTest, RevokedStapled) {
 static const struct OCSPVerifyTestData {
   std::vector<SpawnedTestServer::SSLOptions::OCSPSingleResponse> ocsp_responses;
   SpawnedTestServer::SSLOptions::OCSPProduced ocsp_produced;
-  OCSPVerifyResult::ResponseStatus response_status;
-  // |cert_status| is only used if |response_status| is PROVIDED.
-  OCSPRevocationStatus cert_status;
+  OCSPVerifyResult::ResponseStatus expected_response_status;
+  // |expected_cert_status| is only used if |expected_response_status| is
+  // PROVIDED.
+  OCSPRevocationStatus expected_cert_status;
 } kOCSPVerifyData[] = {
     // 0
     {{{SpawnedTestServer::SSLOptions::OCSP_OK,
@@ -10243,10 +10244,13 @@ TEST_P(HTTPSOCSPVerifyTest, VerifyResult) {
     ssl_info = delegate.ssl_info();
   }
 
-  EXPECT_EQ(test.response_status, ssl_info.ocsp_result.response_status);
+  EXPECT_EQ(test.expected_response_status,
+            ssl_info.ocsp_result.response_status);
 
-  if (test.response_status == OCSPVerifyResult::PROVIDED)
-    EXPECT_EQ(test.cert_status, ssl_info.ocsp_result.revocation_status);
+  if (test.expected_response_status == OCSPVerifyResult::PROVIDED) {
+    EXPECT_EQ(test.expected_cert_status,
+              ssl_info.ocsp_result.revocation_status);
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(OCSPVerify,
