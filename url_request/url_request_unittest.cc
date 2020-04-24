@@ -10014,7 +10014,7 @@ static const struct OCSPVerifyTestData {
   std::vector<SpawnedTestServer::SSLOptions::OCSPSingleResponse> ocsp_responses;
   SpawnedTestServer::SSLOptions::OCSPProduced ocsp_produced;
   OCSPVerifyResult::ResponseStatus response_status;
-  bool has_revocation_status;
+  // |cert_status| is only used if |response_status| is PROVIDED.
   OCSPRevocationStatus cert_status;
 } kOCSPVerifyData[] = {
     // 0
@@ -10022,7 +10022,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::PROVIDED,
-     true,
      OCSPRevocationStatus::GOOD},
 
     // 1
@@ -10030,7 +10029,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_OLD}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::INVALID_DATE,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 2
@@ -10038,7 +10036,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_EARLY}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::INVALID_DATE,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 3
@@ -10046,7 +10043,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_LONG}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::INVALID_DATE,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 4
@@ -10054,7 +10050,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::ERROR_RESPONSE,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 5
@@ -10062,7 +10057,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::PARSE_RESPONSE_ERROR,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 6
@@ -10070,7 +10064,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::PARSE_RESPONSE_DATA_ERROR,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 7
@@ -10078,7 +10071,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_EARLY}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::INVALID_DATE,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 8
@@ -10086,7 +10078,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::PROVIDED,
-     true,
      OCSPRevocationStatus::UNKNOWN},
 
     // 9
@@ -10094,7 +10085,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_OLD}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::INVALID_DATE,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 10
@@ -10102,7 +10092,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_EARLY}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::INVALID_DATE,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 11
@@ -10110,7 +10099,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_BEFORE_CERT,
      OCSPVerifyResult::BAD_PRODUCED_AT,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 12
@@ -10118,7 +10106,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_AFTER_CERT,
      OCSPVerifyResult::BAD_PRODUCED_AT,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 13
@@ -10128,7 +10115,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::PROVIDED,
-     true,
      OCSPRevocationStatus::GOOD},
 
     // 14
@@ -10138,7 +10124,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::PROVIDED,
-     true,
      OCSPRevocationStatus::GOOD},
 
     // 15
@@ -10148,7 +10133,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::PROVIDED,
-     true,
      OCSPRevocationStatus::GOOD},
 
     // 16
@@ -10160,7 +10144,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_LONG}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::INVALID_DATE,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 17
@@ -10172,7 +10155,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::PROVIDED,
-     true,
      OCSPRevocationStatus::REVOKED},
 
     // 18
@@ -10182,7 +10164,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::PROVIDED,
-     true,
      OCSPRevocationStatus::UNKNOWN},
 
     // 19
@@ -10194,7 +10175,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::PROVIDED,
-     true,
      OCSPRevocationStatus::UNKNOWN},
 
     // 20
@@ -10202,7 +10182,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::NO_MATCHING_RESPONSE,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 21
@@ -10210,7 +10189,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_EARLY}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::NO_MATCHING_RESPONSE,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
 // These tests fail when using NSS for certificate verification, as NSS fails
@@ -10222,7 +10200,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_VALID}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::PROVIDED,
-     true,
      OCSPRevocationStatus::REVOKED},
 
     // 23
@@ -10230,7 +10207,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_OLD}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::INVALID_DATE,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 
     // 24
@@ -10238,7 +10214,6 @@ static const struct OCSPVerifyTestData {
        SpawnedTestServer::SSLOptions::OCSP_DATE_LONG}},
      SpawnedTestServer::SSLOptions::OCSP_PRODUCED_VALID,
      OCSPVerifyResult::INVALID_DATE,
-     false,
      OCSPRevocationStatus::UNKNOWN},
 #endif
 };
@@ -10270,7 +10245,7 @@ TEST_P(HTTPSOCSPVerifyTest, VerifyResult) {
 
   EXPECT_EQ(test.response_status, ssl_info.ocsp_result.response_status);
 
-  if (test.has_revocation_status)
+  if (test.response_status == OCSPVerifyResult::PROVIDED)
     EXPECT_EQ(test.cert_status, ssl_info.ocsp_result.revocation_status);
 }
 
