@@ -5,8 +5,8 @@
 #include "net/test/url_request/url_request_failed_job.h"
 
 #include "base/bind.h"
+#include "base/check_op.h"
 #include "base/location.h"
-#include "base/logging.h"
 #include "base/single_thread_task_runner.h"
 #include "base/stl_util.h"
 #include "base/strings/string_number_conversions.h"
