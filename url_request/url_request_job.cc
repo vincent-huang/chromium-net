@@ -589,10 +589,6 @@ std::unique_ptr<SourceStream> URLRequestJob::SetUpSourceStream() {
   return std::make_unique<URLRequestJobSourceStream>(this);
 }
 
-const URLRequestStatus URLRequestJob::GetStatus() {
-  return request_->status();
-}
-
 void URLRequestJob::SetProxyServer(const ProxyServer& proxy_server) {
   request_->proxy_server_ = proxy_server;
 }

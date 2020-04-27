@@ -325,9 +325,6 @@ class NET_EXPORT URLRequestJob {
   // Provides derived classes with access to the request's network delegate.
   NetworkDelegate* network_delegate() { return network_delegate_; }
 
-  // The status of the job.
-  const URLRequestStatus GetStatus();
-
   // Set the proxy server that was used, if any.
   void SetProxyServer(const ProxyServer& proxy_server);
 

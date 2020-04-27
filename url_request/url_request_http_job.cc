@@ -390,8 +390,8 @@ void URLRequestHttpJob::StartTransaction() {
 }
 
 void URLRequestHttpJob::NotifyBeforeStartTransactionCallback(int result) {
-  // Check that there are no callbacks to already canceled requests.
-  DCHECK_NE(URLRequestStatus::CANCELED, GetStatus().status());
+  // The request should not have been cancelled or have already completed.
+  DCHECK(!is_done());
 
   MaybeStartTransactionInternal(result);
 }
@@ -906,10 +906,10 @@ void URLRequestHttpJob::OnStartCompleted(int result) {
 }
 
 void URLRequestHttpJob::OnHeadersReceivedCallback(int result) {
-  awaiting_callback_ = false;
+  // The request should not have been cancelled or have already completed.
+  DCHECK(!is_done());
 
-  // Check that there are no callbacks to already canceled requests.
-  DCHECK_NE(URLRequestStatus::CANCELED, GetStatus().status());
+  awaiting_callback_ = false;
 
   SaveCookiesAndNotifyHeadersComplete(result);
 }
