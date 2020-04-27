@@ -5398,7 +5398,8 @@ INSTANTIATE_TEST_SUITE_P(
         ::testing::Values(false, true),
         ::testing::Values(false, true)));
 
-TEST_P(TLS13DowngradeTest, DowngradeEnforced) {
+// Test is flaky on Android, see crbug.com/1075715.
+TEST_P(TLS13DowngradeTest, DISABLED_DowngradeEnforced) {
   SpawnedTestServer::SSLOptions ssl_options;
   ssl_options.simulate_tls13_downgrade = simulate_tls13_downgrade();
   ssl_options.tls_max_version = tls_max_version();
