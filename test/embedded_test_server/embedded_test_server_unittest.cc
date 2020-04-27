@@ -361,12 +361,13 @@ TEST_P(EmbeddedTestServerTest, ConnectionListenerRead) {
   WaitForResponses(1);
   EXPECT_EQ(1u, connection_listener_.SocketAcceptedCount());
   EXPECT_TRUE(connection_listener_.DidReadFromSocket());
-
-  connection_listener_.WaitUntilGotSocketFromResponseCompleted();
-  EXPECT_TRUE(connection_listener_.DidGetSocketOnComplete());
 }
 
 TEST_P(EmbeddedTestServerTest, ConnectionListenerComplete) {
+  if (GetParam() == EmbeddedTestServer::TYPE_HTTP) {
+    // Test is flaky on HTTP. crbug/1073761.
+    return;
+  }
   ASSERT_TRUE(server_->Start());
 
   std::unique_ptr<URLFetcher> fetcher =
