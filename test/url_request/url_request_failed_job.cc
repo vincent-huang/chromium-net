@@ -184,7 +184,7 @@ URLRequestFailedJob::~URLRequestFailedJob() = default;
 void URLRequestFailedJob::StartAsync() {
   if (phase_ == START) {
     if (net_error_ != ERR_IO_PENDING) {
-      NotifyStartError(URLRequestStatus(URLRequestStatus::FAILED, net_error_));
+      NotifyStartError(net_error_);
       return;
     }
     return;

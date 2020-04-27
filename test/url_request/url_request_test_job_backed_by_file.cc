@@ -210,7 +210,7 @@ void URLRequestTestJobBackedByFile::DidFetchMetaInfo(
 void URLRequestTestJobBackedByFile::DidOpen(int result) {
   OnOpenComplete(result);
   if (result != OK) {
-    NotifyStartError(URLRequestStatus(URLRequestStatus::FAILED, result));
+    NotifyStartError(result);
     return;
   }
 
@@ -244,8 +244,7 @@ void URLRequestTestJobBackedByFile::DidSeek(int64_t result) {
 
   OnSeekComplete(result);
   if (result < 0) {
-    NotifyStartError(URLRequestStatus(URLRequestStatus::FAILED,
-                                      ERR_REQUEST_RANGE_NOT_SATISFIABLE));
+    NotifyStartError(ERR_REQUEST_RANGE_NOT_SATISFIABLE);
     return;
   }
 
