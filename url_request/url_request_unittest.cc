@@ -85,7 +85,9 @@
 #include "net/cert_net/cert_net_fetcher_url_request.h"
 #include "net/cert_net/nss_ocsp_session_url_request.h"
 #include "net/cookies/canonical_cookie_test_helpers.h"
+#include "net/cookies/cookie_constants.h"
 #include "net/cookies/cookie_monster.h"
+#include "net/cookies/cookie_store_test_callbacks.h"
 #include "net/cookies/cookie_store_test_helpers.h"
 #include "net/cookies/test_cookie_access_delegate.h"
 #include "net/disk_cache/disk_cache.h"
@@ -2487,6 +2489,78 @@ TEST_F(URLRequestTest, SameSiteCookiesSpecialScheme) {
     EXPECT_EQ(std::string::npos,
               d.data_received().find("StrictSameSiteCookie"));
     EXPECT_EQ(std::string::npos, d.data_received().find("LaxSameSiteCookie"));
+  }
+}
+
+// Test that SameSite-by-default cookies allow unsafe request methods on
+// cross-site top-level requests for the first 2 minutes after creation, and
+// don't thereafter.
+using URLRequestSameSiteCookieDefaultTest = TestWithMockTime;
+TEST_F(URLRequestSameSiteCookieDefaultTest, SameSiteDefaultLaxAllowUnsafe) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(features::kSameSiteByDefaultCookies);
+
+  HttpTestServer test_server;
+  ASSERT_TRUE(test_server.Start());
+
+  CookieMonster cm(nullptr, nullptr);
+  TestURLRequestContext context(true);
+  context.set_cookie_store(&cm);
+  context.Init();
+
+  GURL same_origin_url =
+      test_server.GetURL("example.test", "/echoheader?Cookie");
+  url::Origin cross_origin =
+      url::Origin::Create(test_server.GetURL("cross-origin.test", "/"));
+
+  // Set a cookie with no specified SameSite attribute directly into the
+  // CookieStore. (In a same-site context, but it doesn't matter.)
+  base::Time start = base::Time::Now();
+  auto cookie = CanonicalCookie::Create(same_origin_url, "default=1", start,
+                                        base::nullopt);
+  ResultSavingCookieCallback<CanonicalCookie::CookieInclusionStatus> callback;
+  cm.SetCanonicalCookieAsync(std::move(cookie), same_origin_url,
+                             CookieOptions::MakeAllInclusive(),
+                             callback.MakeCallback());
+  callback.WaitUntilDone();
+  ASSERT_TRUE(callback.result().IsInclude());
+
+  // Now try to get that cookie via cross-site top-level POST request.
+  {
+    TestDelegate d;
+    std::unique_ptr<URLRequest> req(context.CreateRequest(
+        same_origin_url, DEFAULT_PRIORITY, &d, TRAFFIC_ANNOTATION_FOR_TESTS));
+    req->set_site_for_cookies(SiteForCookies::FromUrl(same_origin_url));
+    req->set_initiator(cross_origin);
+    req->set_method("POST");
+
+    req->Start();
+    ASSERT_LT(base::Time::Now() - start, kLaxAllowUnsafeMaxAge);
+    d.RunUntilComplete();
+
+    // We got the cookie because it's been under 2 minutes since its creation.
+    EXPECT_NE(std::string::npos, d.data_received().find("default=1"));
+  }
+
+  // Fast-forward time until past the Lax-allow-unsafe threshold.
+  FastForwardBy(2 * kLaxAllowUnsafeMaxAge);
+
+  // Try again to get that cookie via cross-site top-level POST request.
+  {
+    TestDelegate d;
+    std::unique_ptr<URLRequest> req(context.CreateRequest(
+        same_origin_url, DEFAULT_PRIORITY, &d, TRAFFIC_ANNOTATION_FOR_TESTS));
+    req->set_site_for_cookies(SiteForCookies::FromUrl(same_origin_url));
+    req->set_initiator(cross_origin);
+    req->set_method("POST");
+
+    req->Start();
+    ASSERT_GT(base::Time::Now() - start, kLaxAllowUnsafeMaxAge);
+    d.RunUntilComplete();
+
+    // We did not get the cookie because it's now Lax and does not allow unsafe
+    // methods.
+    EXPECT_EQ(std::string::npos, d.data_received().find("default=1"));
   }
 }
 
