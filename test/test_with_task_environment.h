@@ -73,14 +73,6 @@ class TestWithTaskEnvironment : public ::testing::Test,
   DISALLOW_COPY_AND_ASSIGN(TestWithTaskEnvironment);
 };
 
-// Specifies MOCK_TIME as time_source, for convenience.
-class TestWithMockTime : public TestWithTaskEnvironment {
- protected:
-  TestWithMockTime()
-      : TestWithTaskEnvironment(
-            base::test::TaskEnvironment::TimeSource::MOCK_TIME) {}
-};
-
 }  // namespace net
 
 #endif  // NET_TEST_TEST_WITH_TASK_ENVIRONMENT_H_
