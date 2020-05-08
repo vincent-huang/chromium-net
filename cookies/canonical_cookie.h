@@ -416,6 +416,51 @@ class NET_EXPORT CanonicalCookie::CookieInclusionStatus {
     // enough to activate the Lax-allow-unsafe intervention.
     WARN_SAMESITE_UNSPECIFIED_LAX_ALLOW_UNSAFE = 2,
 
+    // The following warnings indicate that an included cookie with an effective
+    // SameSite is experiencing a SameSiteCookieContext::|context| ->
+    // SameSiteCookieContext::|schemeful_context| downgrade that will prevent
+    // its access schemefully.
+    // This situation means that a cookie is accessible when the
+    // SchemefulSameSite feature is disabled but not when it's enabled,
+    // indicating changed behavior and potential breakage.
+    //
+    // For example, a Strict to Lax downgrade for an effective SameSite=Strict
+    // cookie:
+    // This cookie would be accessible in the Strict context as its SameSite
+    // value is Strict. However its context for schemeful same-site becomes Lax.
+    // A strict cookie cannot be accessed in a Lax context and therefore the
+    // behavior has changed.
+    // As a counterexample, a Strict to Lax downgrade for an effective
+    // SameSite=Lax cookie: A Lax cookie can be accessed in both Strict and Lax
+    // contexts so there is no behavior change (and we don't warn about it).
+    //
+    // The warnings are in the following format:
+    // WARN_{context}_{schemeful_context}_DOWNGRADE_{samesite_value}_SAMESITE
+    //
+    // Of the following 5 SameSite warnings, there will be, at most, a single
+    // active one.
+
+    // Strict to Lax downgrade for an effective SameSite=Strict cookie.
+    // This warning is only applicable for cookies being sent because a Strict
+    // cookie will be set in both Strict and Lax Contexts so the downgrade will
+    // not affect it.
+    WARN_STRICT_LAX_DOWNGRADE_STRICT_SAMESITE = 3,
+    // Strict to Cross-site downgrade for an effective SameSite=Strict cookie.
+    // This also applies to Strict to Lax Unsafe downgrades due to Lax Unsafe
+    // behaving like Cross-site.
+    WARN_STRICT_CROSS_DOWNGRADE_STRICT_SAMESITE = 4,
+    // Strict to Cross-site downgrade for an effective SameSite=Lax cookie.
+    // This also applies to Strict to Lax Unsafe downgrades due to Lax Unsafe
+    // behaving like Cross-site.
+    WARN_STRICT_CROSS_DOWNGRADE_LAX_SAMESITE = 5,
+    // Lax to Cross-site downgrade for an effective SameSite=Strict cookie.
+    // This warning is only applicable for cookies being set because a Strict
+    // cookie will not be sent in a Lax context so the downgrade would not
+    // affect it.
+    WARN_LAX_CROSS_DOWNGRADE_STRICT_SAMESITE = 6,
+    // Lax to Cross-site downgrade for an effective SameSite=Lax cookie.
+    WARN_LAX_CROSS_DOWNGRADE_LAX_SAMESITE = 7,
+
     // This should be kept last.
     NUM_WARNING_REASONS
   };
@@ -454,6 +499,15 @@ class NET_EXPORT CanonicalCookie::CookieInclusionStatus {
 
   // Whether the given reason for warning is present.
   bool HasWarningReason(WarningReason reason) const;
+
+  // Whether a schemeful downgrade warning is present.
+  // A schemeful downgrade means that an included cookie with an effective
+  // SameSite is experiencing a SameSiteCookieContext::|context| ->
+  // SameSiteCookieContext::|schemeful_context| downgrade that will prevent its
+  // access schemefully. If the function returns true and |reason| is valid then
+  // |reason| will contain which warning was found.
+  bool HasDowngradeWarning(
+      CookieInclusionStatus::WarningReason* reason = nullptr) const;
 
   // Add an warning reason.
   void AddWarningReason(WarningReason reason);
