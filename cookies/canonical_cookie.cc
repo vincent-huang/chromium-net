@@ -694,6 +694,11 @@ CanonicalCookie::CookieInclusionStatus CanonicalCookie::IncludeForRequestURL(
                               CookieEffectiveSameSite::COUNT);
   }
 
+  if (status.ShouldRecordDowngradeMetrics()) {
+    UMA_HISTOGRAM_ENUMERATION("SameSiteContextDowngradeRequest",
+                              status.GetBreakingDowngradeMetricsEnumValue(url));
+  }
+
   // TODO(chlily): Log metrics.
   return status;
 }
@@ -1045,6 +1050,16 @@ void CanonicalCookie::CookieInclusionStatus::MaybeClearSameSiteWarning() {
   }
 }
 
+bool CanonicalCookie::CookieInclusionStatus::ShouldRecordDowngradeMetrics()
+    const {
+  uint32_t context_reasons_mask =
+      GetExclusionBitmask(EXCLUDE_SAMESITE_STRICT) |
+      GetExclusionBitmask(EXCLUDE_SAMESITE_LAX) |
+      GetExclusionBitmask(EXCLUDE_SAMESITE_UNSPECIFIED_TREATED_AS_LAX);
+
+  return (exclusion_reasons_ & ~context_reasons_mask) == 0u;
+}
+
 bool CanonicalCookie::CookieInclusionStatus::ShouldWarn() const {
   return warning_reasons_ != 0u;
 }
@@ -1088,6 +1103,46 @@ void CanonicalCookie::CookieInclusionStatus::AddWarningReason(
 void CanonicalCookie::CookieInclusionStatus::RemoveWarningReason(
     WarningReason reason) {
   warning_reasons_ &= ~(GetWarningBitmask(reason));
+}
+
+CanonicalCookie::CookieInclusionStatus::ContextDowngradeMetricValues
+CanonicalCookie::CookieInclusionStatus::GetBreakingDowngradeMetricsEnumValue(
+    const GURL& url) const {
+  bool url_is_secure = url.SchemeIsCryptographic();
+
+  // Start the |reason| as something other than the downgrade warnings.
+  WarningReason reason = WarningReason::NUM_WARNING_REASONS;
+
+  // Don't bother checking the return value because the default switch case
+  // will handle if no reason was found.
+  HasDowngradeWarning(&reason);
+
+  switch (reason) {
+    case WarningReason::WARN_STRICT_LAX_DOWNGRADE_STRICT_SAMESITE:
+      return url_is_secure
+                 ? ContextDowngradeMetricValues::STRICT_LAX_STRICT_SECURE
+                 : ContextDowngradeMetricValues::STRICT_LAX_STRICT_INSECURE;
+    case WarningReason::WARN_STRICT_CROSS_DOWNGRADE_STRICT_SAMESITE:
+      return url_is_secure
+                 ? ContextDowngradeMetricValues::STRICT_CROSS_STRICT_SECURE
+                 : ContextDowngradeMetricValues::STRICT_CROSS_STRICT_INSECURE;
+    case WarningReason::WARN_STRICT_CROSS_DOWNGRADE_LAX_SAMESITE:
+      return url_is_secure
+                 ? ContextDowngradeMetricValues::STRICT_CROSS_LAX_SECURE
+                 : ContextDowngradeMetricValues::STRICT_CROSS_LAX_INSECURE;
+    case WarningReason::WARN_LAX_CROSS_DOWNGRADE_STRICT_SAMESITE:
+      return url_is_secure
+                 ? ContextDowngradeMetricValues::LAX_CROSS_STRICT_SECURE
+                 : ContextDowngradeMetricValues::LAX_CROSS_STRICT_INSECURE;
+    case WarningReason::WARN_LAX_CROSS_DOWNGRADE_LAX_SAMESITE:
+      return url_is_secure
+                 ? ContextDowngradeMetricValues::LAX_CROSS_LAX_SECURE
+                 : ContextDowngradeMetricValues::LAX_CROSS_LAX_INSECURE;
+    default:
+      return url_is_secure
+                 ? ContextDowngradeMetricValues::NO_DOWNGRADE_SECURE
+                 : ContextDowngradeMetricValues::NO_DOWNGRADE_INSECURE;
+  }
 }
 
 std::string CanonicalCookie::CookieInclusionStatus::GetDebugString() const {
