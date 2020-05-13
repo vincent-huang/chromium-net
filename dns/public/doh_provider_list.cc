@@ -104,6 +104,12 @@ const std::vector<DohProviderEntry>& GetDohProviderList() {
                        "" /* ui_name */, "" /* privacy_policy */,
                        false /* display_globally */,
                        {} /* display_countries */),
+      DohProviderEntry("Cznic", base::nullopt /* provider_id_for_histogram */,
+                       {"185.43.135.1", "2001:148f:fffe::1"},
+                       {"odvr.nic.cz"} /* dns_over_tls_hostnames */,
+                       "https://odvr.nic.cz/doh", "" /* ui_name */,
+                       "" /* privacy_policy */, false /* display_globally */,
+                       {} /* display_countries */),
       // Note: DNS.SB has separate entries for autoupgrade and settings UI to
       // allow the extra |no_ecs| parameter for autoupgrade. This parameter
       // disables EDNS Client Subnet (ECS) handling in order to match the
