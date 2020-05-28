@@ -1572,7 +1572,6 @@ class FilteringTestNetworkDelegate : public TestNetworkDelegate {
   void ResetBlockedSetCookieCount() { blocked_set_cookie_count_ = 0; }
 
   bool OnCanGetCookies(const URLRequest& request,
-                       const net::CookieList& cookie_list,
                        bool allowed_from_caller) override {
     // Filter out cookies if |block_get_cookies_| is set and
     // combine with |allowed_from_caller|.
@@ -1583,7 +1582,7 @@ class FilteringTestNetworkDelegate : public TestNetworkDelegate {
     if (!allowed)
       ++blocked_get_cookie_count_;
 
-    return TestNetworkDelegate::OnCanGetCookies(request, cookie_list, allowed);
+    return TestNetworkDelegate::OnCanGetCookies(request, allowed);
   }
 
   void set_block_get_cookies() { block_get_cookies_ = true; }
