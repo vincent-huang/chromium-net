@@ -579,6 +579,14 @@ class HostResolverManager::RequestImpl
     return results_ ? results_.value().esni_data() : *nullopt_result;
   }
 
+  const base::Optional<std::vector<bool>>& GetIntegrityResultsForTesting()
+      const override {
+    DCHECK(complete_);
+    static const base::NoDestructor<base::Optional<std::vector<bool>>>
+        nullopt_result;
+    return results_ ? results_.value().integrity_data() : *nullopt_result;
+  }
+
   net::ResolveErrorInfo GetResolveErrorInfo() const override {
     DCHECK(complete_);
     return error_info_;
@@ -1111,6 +1119,19 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
           base::FeatureList::IsEnabled(features::kRequestEsniDnsRecords)) {
         transactions_needed_.push(DnsQueryType::ESNI);
       }
+
+      // Queue up an INTEGRITY query if we are allowed to.
+      if (base::FeatureList::IsEnabled(features::kDnsHttpssvc) &&
+          features::kDnsHttpssvcUseIntegrity.Get() &&
+          (secure_ || features::kDnsHttpssvcEnableQueryOverInsecure.Get()) &&
+          (features::dns_httpssvc_experiment::IsExperimentDomain(
+               hostname.as_string()) ||
+           features::dns_httpssvc_experiment::IsControlDomain(
+               hostname.as_string()))) {
+        // We should not be configured to query HTTPSSVC *and* INTEGRITY.
+        DCHECK(!features::kDnsHttpssvcUseHttpssvc.Get());
+        transactions_needed_.push(DnsQueryType::INTEGRITY);
+      }
     }
     num_needed_transactions_ = transactions_needed_.size();
 
@@ -1204,8 +1225,13 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
 
     if (net_error != OK && !(net_error == ERR_NAME_NOT_RESOLVED && response &&
                              response->IsValid())) {
-      OnFailure(net_error, DnsResponse::DNS_PARSE_OK, base::nullopt);
-      return;
+      if (dns_query_type == DnsQueryType::INTEGRITY) {
+        // Do not allow an INTEGRITY query to fail the whole DnsTask.
+        response = nullptr;
+      } else {
+        OnFailure(net_error, DnsResponse::DNS_PARSE_OK, base::nullopt);
+        return;
+      }
     }
 
     DnsResponse::Result parse_result = DnsResponse::DNS_PARSE_RESULT_MAX;
@@ -1230,6 +1256,10 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
         break;
       case DnsQueryType::ESNI:
         parse_result = ParseEsniDnsResponse(response, &results);
+        break;
+      case DnsQueryType::INTEGRITY:
+        // Parse the INTEGRITY records, condensing them into a vector<bool>.
+        parse_result = ParseIntegrityDnsResponse(response, &results);
         break;
     }
     DCHECK_LT(parse_result, DnsResponse::DNS_PARSE_RESULT_MAX);
@@ -1261,6 +1291,10 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
           // It doesn't matter whether the ESNI record is the "front"
           // or the "back" argument to the merge, since the logic for
           // merging addresses from ESNI records is the same in each case.
+          results = HostCache::Entry::MergeEntries(
+              std::move(results), std::move(saved_results_).value());
+          break;
+        case DnsQueryType::INTEGRITY:
           results = HostCache::Entry::MergeEntries(
               std::move(results), std::move(saved_results_).value());
           break;
@@ -1326,6 +1360,7 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
 
   DnsResponse::Result ParseAddressDnsResponse(const DnsResponse* response,
                                               HostCache::Entry* out_results) {
+    DCHECK(response);
     AddressList addresses;
     base::TimeDelta ttl;
     DnsResponse::Result parse_result =
@@ -1346,6 +1381,7 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
 
   DnsResponse::Result ParseTxtDnsResponse(const DnsResponse* response,
                                           HostCache::Entry* out_results) {
+    DCHECK(response);
     std::vector<std::unique_ptr<const RecordParsed>> records;
     base::Optional<base::TimeDelta> response_ttl;
     DnsResponse::Result parse_result = ParseAndFilterResponseRecords(
@@ -1371,6 +1407,7 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
 
   DnsResponse::Result ParsePointerDnsResponse(const DnsResponse* response,
                                               HostCache::Entry* out_results) {
+    DCHECK(response);
     std::vector<std::unique_ptr<const RecordParsed>> records;
     base::Optional<base::TimeDelta> response_ttl;
     DnsResponse::Result parse_result = ParseAndFilterResponseRecords(
@@ -1399,6 +1436,7 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
 
   DnsResponse::Result ParseServiceDnsResponse(const DnsResponse* response,
                                               HostCache::Entry* out_results) {
+    DCHECK(response);
     std::vector<std::unique_ptr<const RecordParsed>> records;
     base::Optional<base::TimeDelta> response_ttl;
     DnsResponse::Result parse_result = ParseAndFilterResponseRecords(
@@ -1430,6 +1468,7 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
 
   DnsResponse::Result ParseEsniDnsResponse(const DnsResponse* response,
                                            HostCache::Entry* out_results) {
+    DCHECK(response);
     std::vector<std::unique_ptr<const RecordParsed>> records;
     base::Optional<base::TimeDelta> response_ttl;
     DnsResponse::Result parse_result = ParseAndFilterResponseRecords(
@@ -1477,6 +1516,42 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
       out_results->set_addresses(std::move(addresses));
     }
 
+    return parse_result;
+  }
+
+  DnsResponse::Result ParseIntegrityDnsResponse(const DnsResponse* response,
+                                                HostCache::Entry* out_results) {
+    base::Optional<base::TimeDelta> response_ttl;
+    const HostCache::Entry default_entry(
+        OK, std::vector<bool>(), HostCache::Entry::SOURCE_DNS, response_ttl);
+
+    if (response == nullptr) {
+      *out_results = default_entry;
+      return DnsResponse::Result::DNS_PARSE_OK;
+    }
+
+    std::vector<std::unique_ptr<const RecordParsed>> records;
+    DnsResponse::Result parse_result = ParseAndFilterResponseRecords(
+        response, dns_protocol::kExperimentalTypeIntegrity, &records,
+        &response_ttl);
+
+    if (parse_result != DnsResponse::DNS_PARSE_OK) {
+      *out_results = default_entry;
+      return DnsResponse::Result::DNS_PARSE_OK;
+    }
+
+    // Condense results into a list of booleans. We do not cache the results,
+    // but this enables us to write some unit tests.
+    std::vector<bool> condensed_results;
+    for (const auto& record : records) {
+      const IntegrityRecordRdata& rdata =
+          *record->rdata<IntegrityRecordRdata>();
+      condensed_results.push_back(rdata.IsIntact());
+    }
+
+    *out_results = HostCache::Entry(OK, std::move(condensed_results),
+                                    HostCache::Entry::SOURCE_DNS, response_ttl);
+    DCHECK_EQ(parse_result, DnsResponse::DNS_PARSE_OK);
     return parse_result;
   }
 

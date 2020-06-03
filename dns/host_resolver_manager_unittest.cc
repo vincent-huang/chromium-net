@@ -86,6 +86,7 @@ using ::testing::AllOf;
 using ::testing::Between;
 using ::testing::ByMove;
 using ::testing::Eq;
+using ::testing::IsEmpty;
 using ::testing::Optional;
 using ::testing::Pair;
 using ::testing::Property;
@@ -8651,6 +8652,385 @@ TEST_F(HostResolverManagerDnsTest, SrvDnsQuery) {
   EXPECT_THAT(priority5,
               testing::UnorderedElementsAre(HostPortPair("bar.com", 80),
                                             HostPortPair("google.com", 5)));
+}
+
+class HostResolverManagerDnsTestIntegrity : public HostResolverManagerDnsTest {
+ public:
+  HostResolverManagerDnsTestIntegrity()
+      : HostResolverManagerDnsTest(
+            base::test::TaskEnvironment::TimeSource::MOCK_TIME) {
+    const base::FieldTrialParams params = {
+        {"DnsHttpssvcUseIntegrity", "true"},
+        {"DnsHttpssvcExperimentDomains", "host"},
+        {"DnsHttpssvcControlDomains", ""},
+        {"DnsHttpssvcEnableQueryOverInsecure", "false"},
+    };
+    scoped_feature_list_.InitAndEnableFeatureWithParameters(
+        features::kDnsHttpssvc, params);
+  }
+
+ protected:
+  struct IntegrityAddRulesOptions {
+    bool add_a = true;
+    bool add_aaaa = true;
+    bool add_integrity = true;
+    bool integrity_mangled = false;
+
+    bool secure_a = true;
+    bool secure_aaaa = true;
+    bool secure_integrity = true;
+
+    bool delay_a = false;
+    bool delay_aaaa = false;
+    bool delay_integrity = false;
+  };
+
+  std::vector<uint8_t> GetValidIntegrityRdata() {
+    const IntegrityRecordRdata kValidRecord({'f', 'o', 'o'});
+    base::Optional<std::vector<uint8_t>> valid_serialized =
+        kValidRecord.Serialize();
+    CHECK(valid_serialized);
+    return *valid_serialized;
+  }
+
+  std::vector<uint8_t> GetMangledIntegrityRdata() {
+    std::vector<uint8_t> rdata = GetValidIntegrityRdata();
+    constexpr size_t kOffset = 2u;
+    CHECK_GT(rdata.size(), kOffset);
+    // Create a mangled version of |kValidRecord| by erasing a byte.
+    rdata.erase(rdata.begin() + kOffset);
+    return rdata;
+  }
+
+  void AddRules(MockDnsClientRuleList rules,
+                const IntegrityAddRulesOptions& options) {
+    if (options.add_a) {
+      rules.emplace_back("host", dns_protocol::kTypeA, options.secure_a,
+                         MockDnsClientRule::Result(MockDnsClientRule::OK),
+                         options.delay_a);
+    }
+
+    if (options.add_aaaa) {
+      rules.emplace_back("host", dns_protocol::kTypeAAAA, options.secure_aaaa,
+                         MockDnsClientRule::Result(MockDnsClientRule::OK),
+                         options.delay_aaaa);
+    }
+
+    if (options.add_integrity) {
+      std::vector<uint8_t> integrity_rdata = options.integrity_mangled
+                                                 ? GetMangledIntegrityRdata()
+                                                 : GetValidIntegrityRdata();
+      rules.emplace_back(
+          "host", dns_protocol::kExperimentalTypeIntegrity,
+          options.secure_integrity,
+          MockDnsClientRule::Result(BuildTestDnsIntegrityResponse(
+              "host", std::move(integrity_rdata))),
+          options.delay_integrity);
+    }
+
+    CreateResolver();
+    UseMockDnsClient(CreateValidDnsConfig(), std::move(rules));
+  }
+
+  std::unique_ptr<ResolveHostResponseHelper> DoIntegrityQuery(bool use_secure) {
+    if (use_secure) {
+      DnsConfigOverrides overrides;
+      overrides.secure_dns_mode = DnsConfig::SecureDnsMode::SECURE;
+      resolver_->SetDnsConfigOverrides(overrides);
+    }
+
+    return std::make_unique<ResolveHostResponseHelper>(resolver_->CreateRequest(
+        HostPortPair("host", 108), NetworkIsolationKey(), NetLogWithSource(),
+        HostResolver::ResolveHostParameters(), resolve_context_.get(),
+        resolve_context_->host_cache()));
+  }
+
+  base::test::ScopedFeatureList scoped_feature_list_;
+};
+
+TEST_F(HostResolverManagerDnsTestIntegrity, IntegrityQuery) {
+  AddRules(CreateDefaultDnsRules(), IntegrityAddRulesOptions());
+
+  std::unique_ptr<ResolveHostResponseHelper> response =
+      DoIntegrityQuery(true /* use_secure */);
+
+  EXPECT_THAT(response->result_error(), IsOk());
+  base::Optional<std::vector<bool>> results =
+      response->request()->GetIntegrityResultsForTesting();
+
+  EXPECT_TRUE(response->request()->GetAddressResults());
+  EXPECT_FALSE(response->request()->GetTextResults());
+  EXPECT_THAT(results, Optional(UnorderedElementsAre(true)));
+}
+
+TEST_F(HostResolverManagerDnsTestIntegrity, IntegrityQueryMangled) {
+  IntegrityAddRulesOptions options;
+  options.integrity_mangled = true;
+  AddRules(CreateDefaultDnsRules(), options);
+
+  std::unique_ptr<ResolveHostResponseHelper> response =
+      DoIntegrityQuery(true /* use_secure */);
+
+  EXPECT_THAT(response->result_error(), IsOk());
+  base::Optional<std::vector<bool>> results =
+      response->request()->GetIntegrityResultsForTesting();
+
+  EXPECT_TRUE(response->request()->GetAddressResults());
+  EXPECT_FALSE(response->request()->GetTextResults());
+  EXPECT_THAT(response->request()->GetIntegrityResultsForTesting(),
+              Optional(UnorderedElementsAre(false)));
+}
+
+TEST_F(HostResolverManagerDnsTestIntegrity, IntegrityQueryOnlyOverSecure) {
+  IntegrityAddRulesOptions rules_options;
+  rules_options.secure_a = false;
+  rules_options.secure_aaaa = false;
+  rules_options.secure_integrity = false;
+
+  AddRules(CreateDefaultDnsRules(), rules_options);
+  std::unique_ptr<ResolveHostResponseHelper> response =
+      DoIntegrityQuery(false /* use_secure */);
+
+  EXPECT_THAT(response->result_error(), IsOk());
+  base::Optional<std::vector<bool>> results =
+      response->request()->GetIntegrityResultsForTesting();
+
+  EXPECT_FALSE(results);
+}
+
+// Ensure that the address results are preserved, even when the INTEGRITY query
+// completes last.
+TEST_F(HostResolverManagerDnsTestIntegrity, IntegrityQueryCompletesLast) {
+  IntegrityAddRulesOptions rules_options;
+  rules_options.delay_a = true;
+  rules_options.delay_aaaa = true;
+  rules_options.delay_integrity = true;
+
+  AddRules(CreateDefaultDnsRules(), rules_options);
+  std::unique_ptr<ResolveHostResponseHelper> response =
+      DoIntegrityQuery(true /* use_secure */);
+
+  constexpr base::TimeDelta kQuantum = base::TimeDelta::FromMilliseconds(10);
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::A));
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::AAAA));
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_TRUE(dns_client_->CompleteOneDelayedTransactionOfType(
+      DnsQueryType::INTEGRITY));
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_THAT(response->result_error(), IsOk());
+  ASSERT_TRUE(response->request()->GetAddressResults());
+  EXPECT_THAT(response->request()->GetAddressResults()->endpoints(),
+              testing::UnorderedElementsAre(CreateExpected("127.0.0.1", 108),
+                                            CreateExpected("::1", 108)));
+  EXPECT_THAT(response->request()->GetIntegrityResultsForTesting(),
+              Optional(UnorderedElementsAre(true)));
+}
+
+// For symmetry with |IntegrityQueryCompletesLast|, test the case where the
+// INTEGRITY query completes first.
+TEST_F(HostResolverManagerDnsTestIntegrity, IntegrityQueryCompletesFirst) {
+  IntegrityAddRulesOptions rules_options;
+  rules_options.delay_a = true;
+  rules_options.delay_aaaa = true;
+  rules_options.delay_integrity = true;
+
+  AddRules(CreateDefaultDnsRules(), rules_options);
+  std::unique_ptr<ResolveHostResponseHelper> response =
+      DoIntegrityQuery(true /* use_secure */);
+
+  constexpr base::TimeDelta kQuantum = base::TimeDelta::FromMilliseconds(10);
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_TRUE(dns_client_->CompleteOneDelayedTransactionOfType(
+      DnsQueryType::INTEGRITY));
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::A));
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::AAAA));
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_THAT(response->result_error(), IsOk());
+  EXPECT_THAT(response->request()->GetIntegrityResultsForTesting(),
+              Optional(UnorderedElementsAre(true)));
+  ASSERT_TRUE(response->request()->GetAddressResults());
+  EXPECT_THAT(response->request()->GetAddressResults()->endpoints(),
+              testing::UnorderedElementsAre(CreateExpected("127.0.0.1", 108),
+                                            CreateExpected("::1", 108)));
+}
+
+// Ensure that the address results are preserved, even when the INTEGRITY query
+// completes last and fails.
+TEST_F(HostResolverManagerDnsTestIntegrity,
+       IntegrityQueryCompletesLastWithError) {
+  IntegrityAddRulesOptions rules_options;
+  rules_options.add_a = true;
+  rules_options.add_aaaa = true;
+  rules_options.add_integrity = false;
+
+  rules_options.delay_a = true;
+  rules_options.delay_aaaa = true;
+  rules_options.delay_integrity = true;
+
+  AddRules(CreateDefaultDnsRules(), rules_options);
+  std::unique_ptr<ResolveHostResponseHelper> response =
+      DoIntegrityQuery(true /* use_secure */);
+
+  constexpr base::TimeDelta kQuantum = base::TimeDelta::FromMilliseconds(10);
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::A));
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::AAAA));
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_FALSE(dns_client_->CompleteOneDelayedTransactionOfType(
+      DnsQueryType::INTEGRITY));
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_THAT(response->result_error(), IsOk());
+  ASSERT_TRUE(response->request()->GetAddressResults());
+  EXPECT_THAT(response->request()->GetAddressResults()->endpoints(),
+              testing::UnorderedElementsAre(CreateExpected("127.0.0.1", 108),
+                                            CreateExpected("::1", 108)));
+  EXPECT_THAT(response->request()->GetIntegrityResultsForTesting(),
+              Optional(IsEmpty()));
+}
+
+// Ensure that the address results are preserved, even when the INTEGRITY query
+// completes first and fails.
+TEST_F(HostResolverManagerDnsTestIntegrity,
+       IntegrityQueryCompletesFirstWithError) {
+  IntegrityAddRulesOptions rules_options;
+  rules_options.add_a = true;
+  rules_options.add_aaaa = true;
+  rules_options.add_integrity = false;
+
+  rules_options.delay_a = true;
+  rules_options.delay_aaaa = true;
+  rules_options.delay_integrity = true;
+
+  AddRules(CreateDefaultDnsRules(), rules_options);
+  std::unique_ptr<ResolveHostResponseHelper> response =
+      DoIntegrityQuery(true /* use_secure */);
+
+  constexpr base::TimeDelta kQuantum = base::TimeDelta::FromMilliseconds(10);
+
+  FastForwardBy(kQuantum);
+
+  // This fails because there is no rule for the INTEGRITY query.
+  ASSERT_FALSE(dns_client_->CompleteOneDelayedTransactionOfType(
+      DnsQueryType::INTEGRITY));
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::A));
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::AAAA));
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_THAT(response->result_error(), IsOk());
+  EXPECT_THAT(response->request()->GetIntegrityResultsForTesting(),
+              Optional(IsEmpty()));
+  ASSERT_TRUE(response->request()->GetAddressResults());
+  EXPECT_THAT(response->request()->GetAddressResults()->endpoints(),
+              testing::UnorderedElementsAre(CreateExpected("127.0.0.1", 108),
+                                            CreateExpected("::1", 108)));
+}
+
+TEST_F(HostResolverManagerDnsTestIntegrity,
+       IntegrityQueryCompletesLastMangled) {
+  IntegrityAddRulesOptions rules_options;
+  rules_options.integrity_mangled = true;
+
+  rules_options.delay_a = true;
+  rules_options.delay_aaaa = true;
+  rules_options.delay_integrity = true;
+
+  AddRules(CreateDefaultDnsRules(), rules_options);
+  std::unique_ptr<ResolveHostResponseHelper> response =
+      DoIntegrityQuery(true /* use_secure */);
+
+  constexpr base::TimeDelta kQuantum = base::TimeDelta::FromMilliseconds(10);
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::A));
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::AAAA));
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_TRUE(dns_client_->CompleteOneDelayedTransactionOfType(
+      DnsQueryType::INTEGRITY));
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_THAT(response->result_error(), IsOk());
+  ASSERT_TRUE(response->request()->GetAddressResults());
+  EXPECT_THAT(response->request()->GetAddressResults()->endpoints(),
+              testing::UnorderedElementsAre(CreateExpected("127.0.0.1", 108),
+                                            CreateExpected("::1", 108)));
+  EXPECT_THAT(response->request()->GetIntegrityResultsForTesting(),
+              Optional(UnorderedElementsAre(false)));
+}
+
+TEST_F(HostResolverManagerDnsTestIntegrity,
+       IntegrityQueryCompletesFirstMangled) {
+  IntegrityAddRulesOptions rules_options;
+  rules_options.integrity_mangled = true;
+
+  rules_options.delay_a = true;
+  rules_options.delay_aaaa = true;
+  rules_options.delay_integrity = true;
+
+  AddRules(CreateDefaultDnsRules(), rules_options);
+  std::unique_ptr<ResolveHostResponseHelper> response =
+      DoIntegrityQuery(true /* use_secure */);
+
+  constexpr base::TimeDelta kQuantum = base::TimeDelta::FromMilliseconds(10);
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_TRUE(dns_client_->CompleteOneDelayedTransactionOfType(
+      DnsQueryType::INTEGRITY));
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::A));
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::AAAA));
+
+  FastForwardBy(kQuantum);
+
+  ASSERT_THAT(response->result_error(), IsOk());
+  EXPECT_THAT(response->request()->GetIntegrityResultsForTesting(),
+              Optional(UnorderedElementsAre(false)));
+  ASSERT_TRUE(response->request()->GetAddressResults());
+  EXPECT_THAT(response->request()->GetAddressResults()->endpoints(),
+              testing::UnorderedElementsAre(CreateExpected("127.0.0.1", 108),
+                                            CreateExpected("::1", 108)));
 }
 
 TEST_F(HostResolverManagerDnsTest, DohProbeRequest) {
