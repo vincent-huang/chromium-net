@@ -1191,10 +1191,10 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
     return trans;
   }
 
-  void OnEsniTransactionTimeout() {
-    // Currently, the ESNI transaction timer only gets started
-    // when all non-ESNI transactions have completed.
-    DCHECK(TaskIsCompleteOrOnlyEsniTransactionsRemain());
+  void OnExperimentalQueryTimeout(uint16_t qtype) {
+    // Currently, the HTTPSSVC/INTEGRITY or ESNI transaction timer only gets
+    // started when all other transactions have completed.
+    DCHECK(TaskIsCompleteOrOnlyQtypeTransactionsRemain(qtype));
 
     num_completed_transactions_ += transactions_started_.size();
     DCHECK(num_completed_transactions_ == num_needed_transactions());
@@ -1312,12 +1312,15 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
     if (num_completed_transactions_ < num_needed_transactions()) {
       delegate_->OnIntermediateTransactionComplete();
       MaybeStartEsniTimer();
+      MaybeStartExperimentalQueryTimer();
       return;
     }
 
     // Since all transactions are complete, in particular, all ESNI transactions
     // are complete (if any were started).
     esni_cancellation_timer_.Stop();
+
+    experimental_query_cancellation_timer_.Stop();
 
     ProcessResultsOnCompletion();
   }
@@ -1711,12 +1714,11 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
     delegate_->OnDnsTaskComplete(task_start_time_, results, secure_);
   }
 
-  // Returns whether all transactions left to execute are of transaction
-  // type ESNI. (In particular, this is the case if all transactions are
-  // complete.)
-  // Used for logging and starting the ESNI transaction timer (see
+  // Returns whether all transactions left to execute are of transaction type
+  // |qtype|. (In particular, this is the case if all transactions are
+  // complete.) Used for logging and starting the ESNI transaction timer (see
   // MaybeStartEsniTimer).
-  bool TaskIsCompleteOrOnlyEsniTransactionsRemain() const {
+  bool TaskIsCompleteOrOnlyQtypeTransactionsRemain(uint16_t qtype) const {
     // Since DoH runs all transactions concurrently and
     // DnsQueryType::UNSPECIFIED-with-ESNI tasks are only run using DoH,
     // this method only needs to check the transactions in transactions_started_
@@ -1728,8 +1730,13 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
         transactions_started_.begin(), transactions_started_.end(),
         [&](const std::unique_ptr<DnsTransaction>& p) {
           DCHECK(p);
-          return p->GetType() == dns_protocol::kExperimentalTypeEsniDraft4;
+          return p->GetType() == qtype;
         });
+  }
+
+  bool TaskIsCompleteOrOnlyEsniTransactionsRemain() const {
+    return TaskIsCompleteOrOnlyQtypeTransactionsRemain(
+        dns_protocol::kExperimentalTypeEsniDraft4);
   }
 
   // If ESNI transactions are being executed as part of this task
@@ -1756,7 +1763,42 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
               total_time_taken_for_other_transactions *
                   (0.01 *
                    features::kEsniDnsMaxRelativeAdditionalWaitPercent.Get())),
-          this, &DnsTask::OnEsniTransactionTimeout);
+          base::BindOnce(&DnsTask::OnExperimentalQueryTimeout,
+                         base::Unretained(this),
+                         dns_protocol::kExperimentalTypeEsniDraft4));
+    }
+  }
+
+  void MaybeStartExperimentalQueryTimer() {
+    DCHECK(!transactions_started_.empty());
+
+    // Abort if neither HTTPSSVC nor INTEGRITY querying is enabled.
+    if (!base::FeatureList::IsEnabled(features::kDnsHttpssvc) ||
+        (!features::kDnsHttpssvcUseIntegrity.Get() &&
+         !features::kDnsHttpssvcUseHttpssvc.Get())) {
+      return;
+    }
+
+    if (!experimental_query_cancellation_timer_.IsRunning() &&
+        TaskIsCompleteOrOnlyQtypeTransactionsRemain(
+            dns_protocol::kExperimentalTypeIntegrity)) {
+      const base::TimeDelta kExtraTimeAbsolute =
+          features::dns_httpssvc_experiment::GetExtraTimeAbsolute();
+      const int kExtraTimePercent =
+          features::kDnsHttpssvcExtraTimePercent.Get();
+
+      base::TimeDelta total_time_for_other_transactions =
+          tick_clock_->NowTicks() - task_start_time_;
+      base::TimeDelta relative_timeout =
+          total_time_for_other_transactions * kExtraTimePercent / 100;
+
+      base::TimeDelta timeout = std::min(kExtraTimeAbsolute, relative_timeout);
+
+      experimental_query_cancellation_timer_.Start(
+          FROM_HERE, timeout,
+          base::BindOnce(&DnsTask::OnExperimentalQueryTimeout,
+                         base::Unretained(this),
+                         dns_protocol::kExperimentalTypeIntegrity));
     }
   }
 
@@ -1796,6 +1838,10 @@ class HostResolverManager::DnsTask : public base::SupportsWeakPtr<DnsTask> {
   // Timer for early abort of ESNI transactions. See comments describing
   // the timeout parameters in net/base/features.h.
   base::OneShotTimer esni_cancellation_timer_;
+
+  // Timer for early abort of experimental queries. See comments describing the
+  // timeout parameters in net/base/features.h.
+  base::OneShotTimer experimental_query_cancellation_timer_;
 
   DISALLOW_COPY_AND_ASSIGN(DnsTask);
 };

@@ -8810,9 +8810,9 @@ TEST_F(HostResolverManagerDnsTestIntegrity, IntegrityQueryCompletesLast) {
   std::unique_ptr<ResolveHostResponseHelper> response =
       DoIntegrityQuery(true /* use_secure */);
 
-  constexpr base::TimeDelta kQuantum = base::TimeDelta::FromMilliseconds(10);
+  constexpr base::TimeDelta kQuantum = base::TimeDelta::FromMilliseconds(1);
 
-  FastForwardBy(kQuantum);
+  FastForwardBy(100 * kQuantum);
 
   ASSERT_TRUE(
       dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::A));
@@ -8824,6 +8824,11 @@ TEST_F(HostResolverManagerDnsTestIntegrity, IntegrityQueryCompletesLast) {
   ASSERT_TRUE(dns_client_->CompleteOneDelayedTransactionOfType(
       DnsQueryType::INTEGRITY));
 
+  // Above, the A/AAAA queries took 100 time units. We only fast forward by 1
+  // time unit (1%) before answering the INTEGRITY query, to avoid triggering
+  // the timeout logic. This should work, assuming
+  //   (1) the relative timeout is > 1% and
+  //   (2) the absolute timeout is < (101 * kQuantum).
   FastForwardBy(kQuantum);
 
   ASSERT_THAT(response->result_error(), IsOk());
@@ -8831,6 +8836,9 @@ TEST_F(HostResolverManagerDnsTestIntegrity, IntegrityQueryCompletesLast) {
   EXPECT_THAT(response->request()->GetAddressResults()->endpoints(),
               testing::UnorderedElementsAre(CreateExpected("127.0.0.1", 108),
                                             CreateExpected("::1", 108)));
+  // If this expectation fails, the INTEGRITY query was probably timed out.
+  // Check the |kDnsHttpssvcExtraTimeMs| and |kDnsHttpssvcExtraTimePercent|
+  // feature params in relation to this test's FastForward steps.
   EXPECT_THAT(response->request()->GetIntegrityResultsForTesting(),
               Optional(UnorderedElementsAre(true)));
 }
@@ -8889,9 +8897,9 @@ TEST_F(HostResolverManagerDnsTestIntegrity,
   std::unique_ptr<ResolveHostResponseHelper> response =
       DoIntegrityQuery(true /* use_secure */);
 
-  constexpr base::TimeDelta kQuantum = base::TimeDelta::FromMilliseconds(10);
+  constexpr base::TimeDelta kQuantum = base::TimeDelta::FromMilliseconds(1);
 
-  FastForwardBy(kQuantum);
+  FastForwardBy(100 * kQuantum);
 
   ASSERT_TRUE(
       dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::A));
@@ -8970,9 +8978,9 @@ TEST_F(HostResolverManagerDnsTestIntegrity,
   std::unique_ptr<ResolveHostResponseHelper> response =
       DoIntegrityQuery(true /* use_secure */);
 
-  constexpr base::TimeDelta kQuantum = base::TimeDelta::FromMilliseconds(10);
+  constexpr base::TimeDelta kQuantum = base::TimeDelta::FromMilliseconds(1);
 
-  FastForwardBy(kQuantum);
+  FastForwardBy(100 * kQuantum);
 
   ASSERT_TRUE(
       dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::A));
@@ -9031,6 +9039,155 @@ TEST_F(HostResolverManagerDnsTestIntegrity,
   EXPECT_THAT(response->request()->GetAddressResults()->endpoints(),
               testing::UnorderedElementsAre(CreateExpected("127.0.0.1", 108),
                                             CreateExpected("::1", 108)));
+}
+
+// Make sure that INTEGRITY queries don't get cancelled *before* the configured
+// timeout, but do get cancelled after it, in the case where the absolute
+// timeout dominates.
+TEST_F(HostResolverManagerDnsTestIntegrity, RespectsAbsoluteTimeout) {
+  IntegrityAddRulesOptions rules_options;
+  rules_options.delay_a = true;
+  rules_options.delay_aaaa = true;
+  rules_options.delay_integrity = true;
+
+  AddRules(CreateDefaultDnsRules(), rules_options);
+
+  std::unique_ptr<ResolveHostResponseHelper> response =
+      DoIntegrityQuery(true /* use_secure */);
+
+  //                                  relative_timeout
+  //                         ┌────────────────────────────────┤
+  //                         │
+  //                         │  absolute_timeout
+  //                         ├────────────────────┤
+  //       a_aaaa_elapsed    │                                             time
+  //    ├────────────────────┼─────────────────────────────────────────────────>
+  //   Now                   └ (moment when A and AAAA complete)
+  //
+  // When the A and AAAA queries complete, and only INTEGRITY remains, we start
+  // running the INTEGRITY timeout clock. This moment is |Now + a_aaaa_elapsed|,
+  // or just |a_aaaa_elapsed| if we let Now = 0. The INTEGRITY query is
+  // cancelled at the moment that |absolute_timeout| or |relative_timeout| runs
+  // out.
+  //
+  // The TimeDelta values of |absolute_timeout| and |relative_timeout| are
+  // computed from feature params.
+  //
+  //   absolute_timeout = a_aaaa_elapsed + ExtraMs.
+  //
+  //   relative_timeout = a_aaaa_elapsed * (1 + (ExtraPercent/100)).
+  //
+  // Assume ExtraMs > 0 and 0 < ExtraPercent < 100.
+  //
+  // For this test, we want the absolute timeout to happen *before* the relative
+  // timeout. Compute a value for a_aaaa_elapsed such that absolute_timeout
+  // comes before relative_timeout.
+  //
+  // Assuming ExtraPercent is not zero, we know that these two lines intersect
+  // for some value of a_aaaa_elapsed. Let's find it.
+  //
+  // Assume absolute_timeout = relative_timeout.
+  //   a_aaaa_elapsed + ExtraMs = a_aaaa_elapsed * (1 + (ExtraPercent / 100)).
+  //   ExtraMs = a_aaaa_elapsed * (1 + (ExtraPercent / 100)) - a_aaaa_elapsed.
+  //   ExtraMs = a_aaaa_elapsed * ((1 + (ExtraPercent / 100)) - 1).
+  //   ExtraMs / ((1 + (ExtraPercent / 100)) - 1) = a_aaaa_elapsed.
+  // Simplified:
+  //   a_aaaa_elapsed = 100 * ExtraMs / ExtraPercent.
+  //
+  // For values of a_aaaa_elapsed < 100 * ExtraMs / ExtraPercent,
+  // relative_timeout < absolute_timeout. For larger values, absolute_timeout >
+  // relative_timeout.
+
+  base::TimeDelta absolute_timeout = base::TimeDelta::FromMilliseconds(
+      features::kDnsHttpssvcExtraTimeMs.Get());
+  base::TimeDelta intersection =
+      100 * absolute_timeout / features::kDnsHttpssvcExtraTimePercent.Get();
+
+  // Let enough time pass during the A and AAAA transactions that the
+  // absolute timeout will be less than the relative timeout.
+  base::TimeDelta a_aaaa_elapsed = 50 * intersection;
+
+  FastForwardBy(a_aaaa_elapsed);
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::A));
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::AAAA));
+
+  // Since the A and AAAA queries have only just completed, we shouldn't
+  // have timed out the INTEGRITY query.
+  EXPECT_FALSE(response->complete());
+
+  // After half of the absolute timeout, the query should still be alive.
+  FastForwardBy(absolute_timeout / 2);
+
+  // Since the absolute timeout has not yet elapsed, and it is shorter by
+  // design than the relative timeout, we shouldn't
+  // have timed out the INTEGRITY transaction.
+  EXPECT_FALSE(response->complete());
+
+  // After (more than) the timeout has passed, we should have cancelled
+  // the INTEGRITY transaction.
+  FastForwardBy(absolute_timeout);
+  ASSERT_THAT(response->result_error(), IsOk());
+
+  // Since we cancelled the transaction, we shouldn't have any INTEGRITY
+  // results.
+  EXPECT_FALSE(response->request()->GetIntegrityResultsForTesting());
+
+  // Out of paranoia, pass some more time to ensure no crashes occur.
+  FastForwardBy(base::TimeDelta::FromMilliseconds(100));
+}
+
+TEST_F(HostResolverManagerDnsTestIntegrity, RespectsRelativeTimeout) {
+  IntegrityAddRulesOptions rules_options;
+  rules_options.delay_a = false;
+  rules_options.delay_aaaa = true;
+  rules_options.delay_integrity = true;
+
+  AddRules(CreateDefaultDnsRules(), rules_options);
+
+  std::unique_ptr<ResolveHostResponseHelper> response =
+      DoIntegrityQuery(true /* use_secure */);
+
+  base::TimeDelta absolute_timeout = base::TimeDelta::FromMilliseconds(
+      features::kDnsHttpssvcExtraTimeMs.Get());
+  base::TimeDelta intersection =
+      100 * absolute_timeout / features::kDnsHttpssvcExtraTimePercent.Get();
+
+  // Let little enough time pass during the A and AAAA transactions that the
+  // relative timeout will be less than the absolute timeout.
+  base::TimeDelta a_aaaa_elapsed = 0.05 * intersection;
+
+  // Since the A and AAAA queries haven't both completed yet, we shouldn't time
+  // out the INTEGRITY query.
+  FastForwardBy(a_aaaa_elapsed);
+
+  // Upon completing the AAAA transaction, the INTEGRITY timer should start
+  ASSERT_TRUE(
+      dns_client_->CompleteOneDelayedTransactionOfType(DnsQueryType::AAAA));
+
+  base::TimeDelta relative_timeout =
+      a_aaaa_elapsed * features::kDnsHttpssvcExtraTimePercent.Get() / 100;
+
+  // After *less* than the relative timeout, the query shouldn't have concluded.
+  FastForwardBy(relative_timeout * 0.5);
+
+  EXPECT_FALSE(response->complete());
+
+  // After more than the relative timeout, the query should conclude by aborting
+  // the INTEGRITY query.
+  FastForwardBy(relative_timeout);
+
+  // The task should have completed with a cancelled INTEGRITY query.
+  ASSERT_THAT(response->result_error(), IsOk());
+  EXPECT_FALSE(response->request()->GetIntegrityResultsForTesting());
+  ASSERT_TRUE(response->request()->GetAddressResults());
+  EXPECT_THAT(response->request()->GetAddressResults()->endpoints(),
+              testing::UnorderedElementsAre(CreateExpected("127.0.0.1", 108),
+                                            CreateExpected("::1", 108)));
+
+  // Out of paranoia, pass some more time to ensure no crashes occur.
+  FastForwardBy(base::TimeDelta::FromMilliseconds(100));
 }
 
 TEST_F(HostResolverManagerDnsTest, DohProbeRequest) {
