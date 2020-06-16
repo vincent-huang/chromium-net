@@ -8,8 +8,11 @@ of their two days working on bug triage/investigation.
 ## 1. Review untriaged bugs
 
 Look through [this list of untriaged
-bugs](https://bugs.chromium.org/p/chromium/issues/list?sort=pri%20-opened&q=component%3AInternals%3ENetwork%20status%3Aunconfirmed%2Cuntriaged%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3EDNS%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3ECertificate%20-component%3AInternals%3ENetwork%3EReportingAndNEL%20-component%3AInternals%3ENetwork%3EDataUse%20-component%3AInternals%3ENetwork%3EEV%20-component%3AInternals%3ENetwork%3EDataProxy%20-component%3AInternals%3ENetwork%3ECertTrans%20-component%3AInternals%3ENetwork%3ENetworkQuality%20-component%3AInternals%3ENetwork%3EDoH%20-component%3AInternals%3ENetwork%3ENetInfo%20-component%3AInternals%3ENetwork%3EVPN),
-with the goal of closing them, assigning, or marking available.
+bugs](https://bugs.chromium.org/p/chromium/issues/list?sort=pri%20-opened&q=component%3AInternals%3ENetwork%20status%3Aunconfirmed%2Cuntriaged%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3EDNS%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3ECertificate%20-component%3AInternals%3ENetwork%3EReportingAndNEL%20-component%3AInternals%3ENetwork%3EDataUse%20-component%3AInternals%3ENetwork%3EEV%20-component%3AInternals%3ENetwork%3EDataProxy%20-component%3AInternals%3ENetwork%3ECertTrans%20-component%3AInternals%3ENetwork%3ENetworkQuality%20-component%3AInternals%3ENetwork%3EDoH%20-component%3AInternals%3ENetwork%3ENetInfo%20-component%3AInternals%3ENetwork%3EVPN).
+
+* Go through them in the given order (top to bottom).
+  The link sorts them by priority and then recency.
+* The goal is to move them out of the untriaged bug queue and give them a priority.
 
 For each bug try to:
 
@@ -47,12 +50,14 @@ crashers](https://goto.google.com/network_triage_internal#investigating-crashers
 ## 2. Follow-up on issues with the Needs-Feedback label
 
 Look through [this list of Needs=Feedback
-bugs](https://bugs.chromium.org/p/chromium/issues/list?sort=pri%20-modified&q=component%3AInternals%3ENetwork%20Needs%3DFeedback%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3EDNS%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3ECertificate%20-component%3AInternals%3ENetwork%3EReportingAndNEL%20-component%3AInternals%3ENetwork%3EDataUse%20-component%3AInternals%3ENetwork%3EEV%20-component%3AInternals%3ENetwork%3EDataProxy%20-component%3AInternals%3ENetwork%3ECertTrans%20-component%3AInternals%3ENetwork%3ENetworkQuality%20-component%3AInternals%3ENetwork%3EDoH%20-component%3AInternals%3ENetwork%3ENetInfo%20-component%3AInternals%3ENetwork%3EVPN)
+bugs](https://bugs.chromium.org/p/chromium/issues/list?sort=pri%20-modified&q=component%3AInternals%3ENetwork%20Needs%3DFeedback%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3EDNS%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3ECertificate%20-component%3AInternals%3ENetwork%3EReportingAndNEL%20-component%3AInternals%3ENetwork%3EDataUse%20-component%3AInternals%3ENetwork%3EEV%20-component%3AInternals%3ENetwork%3EDataProxy%20-component%3AInternals%3ENetwork%3ECertTrans%20-component%3AInternals%3ENetwork%3ENetworkQuality%20-component%3AInternals%3ENetwork%3EDoH%20-component%3AInternals%3ENetwork%3ENetInfo%20-component%3AInternals%3ENetwork%3EVPN).
 
+* Go through them in the given order (top to bottom).
+  The link sorts them by priority and then recency.
 * If the requested feedback was provided, review the new information and repeat
-  the same steps as (1) based on the new information.
-* If the bug has had the `Needs-Feedback` label for over a week, and the
-  feedback needed to make progress was not provided, archive the bug.
+  the same steps as (1) to re-triage based on the new information.
+* If the bug had the `Needs-Feedback` label for over a week and the
+  feedback needed to make progress was not yet provided, archive the bug.
 
 ## 3. (Optional) Look through crash reports
 
