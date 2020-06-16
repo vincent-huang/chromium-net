@@ -19,7 +19,7 @@ For each bug try to:
 * Remove the `Internals>Network` component if it belongs elsewhere
 * Dupe it against an existing bug
 * Close it `WontFix` if appropriate
-* Give the bug a priority
+* Give the bug a priority. Refer to [this (internal) document for guidelines](https://goto.google.com/xnzwn)
 * If the bug is a potential security issue (Allows for code execution from remote
   site, allows crossing security boundaries, unchecked array bounds, etc) mark
   it `Type-Bug-Security`.
@@ -84,3 +84,13 @@ bugs on the public mailing list.
 * Owners for the network bug triage rotation can find instructions on
 generating and modifying shifts
 [here (internal-only)](https://goto.google.com/pflvb).
+
+* An overview of bug trends can be seen on [Chromium
+  Dashboard](https://chromiumdash.appspot.com/components/Internals/Network?project=Chromium)
+
+* There is also an [internal dashboard with bug trends for Web
+  Platform](https://goto.google.com/vufyq) that includes network issues.
+
+* The issue tracker doesn't track any official mappings between components and
+  OWNERS. This [internal document](https://goto.google.com/kojfj) enumerates
+  the known owners for subcomponents.
