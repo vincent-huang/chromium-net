@@ -8,7 +8,7 @@ of their two days working on bug triage/investigation.
 ## 1. Review untriaged bugs
 
 Look through [this list of untriaged
-bugs](https://bugs.chromium.org/p/chromium/issues/list?q=component%3AInternals%3ENetwork%20status%3Aunconfirmed%2Cuntriaged%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3EDNS%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3ECertificate%20-component%3AInternals%3ENetwork%3EReportingAndNEL%20-component%3AInternals%3ENetwork%3EDataUse%20-component%3AInternals%3ENetwork%3EEV%20-component%3AInternals%3ENetwork%3EDataProxy%20-component%3AInternals%3ENetwork%3ECertTrans%20-component%3AInternals%3ENetwork%3ENetworkQuality%20-component%3AInternals%3ENetwork%3EDoH%20-component%3AInternals%3ENetwork%3ENetInfo%20-component%3AOS%3ESystems%3ENetwork&sort=pri%20-opened),
+bugs](https://bugs.chromium.org/p/chromium/issues/list?sort=pri%20-opened&q=component%3AInternals%3ENetwork%20status%3Aunconfirmed%2Cuntriaged%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3EDNS%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3ECertificate%20-component%3AInternals%3ENetwork%3EReportingAndNEL%20-component%3AInternals%3ENetwork%3EDataUse%20-component%3AInternals%3ENetwork%3EEV%20-component%3AInternals%3ENetwork%3EDataProxy%20-component%3AInternals%3ENetwork%3ECertTrans%20-component%3AInternals%3ENetwork%3ENetworkQuality%20-component%3AInternals%3ENetwork%3EDoH%20-component%3AInternals%3ENetwork%3ENetInfo%20-component%3AInternals%3ENetwork%3EVPN),
 with the goal of closing them, assigning, or marking available.
 
 For each bug try to:
@@ -47,7 +47,7 @@ crashers](https://goto.google.com/network_triage_internal#investigating-crashers
 ## 2. Follow-up on issues with the Needs-Feedback label
 
 Look through [this list of Needs=Feedback
-bugs](https://bugs.chromium.org/p/chromium/issues/list?q=component%3AInternals%3ENetwork%20Needs%3DFeedback%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3EDNS%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3ECertificate%20-component%3AInternals%3ENetwork%3EReportingAndNEL%20-component%3AInternals%3ENetwork%3EDataUse%20-component%3AInternals%3ENetwork%3EEV%20-component%3AInternals%3ENetwork%3EDataProxy%20-component%3AInternals%3ENetwork%3ECertTrans%20-component%3AInternals%3ENetwork%3ENetworkQuality%20-component%3AInternals%3ENetwork%3EDoH%20-component%3AInternals%3ENetwork%3ENetInfo%20-component%3AOS%3ESystems%3ENetwork&sort=pri%20-modified)
+bugs](https://bugs.chromium.org/p/chromium/issues/list?sort=pri%20-modified&q=component%3AInternals%3ENetwork%20Needs%3DFeedback%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3EDNS%20-component%3AInternals%3ENetwork%3ECookies%20-component%3AInternals%3ENetwork%3ECertificate%20-component%3AInternals%3ENetwork%3EReportingAndNEL%20-component%3AInternals%3ENetwork%3EDataUse%20-component%3AInternals%3ENetwork%3EEV%20-component%3AInternals%3ENetwork%3EDataProxy%20-component%3AInternals%3ENetwork%3ECertTrans%20-component%3AInternals%3ENetwork%3ENetworkQuality%20-component%3AInternals%3ENetwork%3EDoH%20-component%3AInternals%3ENetwork%3ENetInfo%20-component%3AInternals%3ENetwork%3EVPN)
 
 * If the requested feedback was provided, review the new information and repeat
   the same steps as (1) based on the new information.
