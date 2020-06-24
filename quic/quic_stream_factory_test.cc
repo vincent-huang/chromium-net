@@ -3150,44 +3150,22 @@ void QuicStreamFactoryTestBase::TestOnNetworkMadeDefaultNonMigratableStream(
     quic_data1.AddRead(SYNCHRONOUS, ERR_IO_PENDING);  // Hanging read.
     // A RESET will be sent to the peer to cancel the non-migratable stream.
     if (VersionUsesHttp3(version_.transport_version)) {
-      if (GetQuicReloadableFlag(quic_advance_ack_timeout_update)) {
         quic_data1.AddWrite(SYNCHRONOUS,
                             client_maker_.MakeDataRstAndAckPacket(
                                 packet_num++, true, GetQpackDecoderStreamId(),
                                 StreamCancellationQpackDecoderInstruction(0),
                                 GetNthClientInitiatedBidirectionalStreamId(0),
                                 quic::QUIC_STREAM_CANCELLED, 1, 1));
-      } else {
-        quic_data1.AddWrite(SYNCHRONOUS,
-                            client_maker_.MakeDataAndRstPacket(
-                                packet_num++, true, GetQpackDecoderStreamId(),
-                                StreamCancellationQpackDecoderInstruction(0),
-                                GetNthClientInitiatedBidirectionalStreamId(0),
-                                quic::QUIC_STREAM_CANCELLED));
-      }
     } else {
-      if (GetQuicReloadableFlag(quic_advance_ack_timeout_update)) {
         quic_data1.AddWrite(SYNCHRONOUS,
                             client_maker_.MakeAckAndRstPacket(
                                 packet_num++, false,
                                 GetNthClientInitiatedBidirectionalStreamId(0),
                                 quic::QUIC_STREAM_CANCELLED, 1, 1, 1));
-      } else {
-        quic_data1.AddWrite(SYNCHRONOUS,
-                            client_maker_.MakeRstPacket(
-                                packet_num++, false,
-                                GetNthClientInitiatedBidirectionalStreamId(0),
-                                quic::QUIC_STREAM_CANCELLED));
-      }
     }
     // Ping packet to send after migration is completed.
-    if (GetQuicReloadableFlag(quic_advance_ack_timeout_update)) {
       quic_data1.AddWrite(SYNCHRONOUS,
                           client_maker_.MakePingPacket(packet_num++, false));
-    } else {
-      quic_data1.AddWrite(SYNCHRONOUS, client_maker_.MakeAckAndPingPacket(
-                                           packet_num++, false, 1, 1, 1));
-    }
   } else {
     if (version_.UsesTls()) {
       if (VersionUsesHttp3(version_.transport_version)) {
@@ -5736,45 +5714,23 @@ void QuicStreamFactoryTestBase::TestMigrateSessionEarlyNonMigratableStream(
     quic_data1.AddRead(SYNCHRONOUS, ERR_IO_PENDING);  // Hanging read.
     // A RESET will be sent to the peer to cancel the non-migratable stream.
     if (VersionUsesHttp3(version_.transport_version)) {
-      if (GetQuicReloadableFlag(quic_advance_ack_timeout_update)) {
         quic_data1.AddWrite(SYNCHRONOUS,
                             client_maker_.MakeDataRstAndAckPacket(
                                 packet_num++, true, GetQpackDecoderStreamId(),
                                 StreamCancellationQpackDecoderInstruction(0),
                                 GetNthClientInitiatedBidirectionalStreamId(0),
                                 quic::QUIC_STREAM_CANCELLED, 1, 1));
-      } else {
-        quic_data1.AddWrite(SYNCHRONOUS,
-                            client_maker_.MakeDataAndRstPacket(
-                                packet_num++, true, GetQpackDecoderStreamId(),
-                                StreamCancellationQpackDecoderInstruction(0),
-                                GetNthClientInitiatedBidirectionalStreamId(0),
-                                quic::QUIC_STREAM_CANCELLED));
-      }
     } else {
-      if (GetQuicReloadableFlag(quic_advance_ack_timeout_update)) {
         quic_data1.AddWrite(SYNCHRONOUS,
                             client_maker_.MakeAckAndRstPacket(
                                 packet_num++, false,
                                 GetNthClientInitiatedBidirectionalStreamId(0),
                                 quic::QUIC_STREAM_CANCELLED, 1, 1, 1));
-      } else {
-        quic_data1.AddWrite(SYNCHRONOUS,
-                            client_maker_.MakeRstPacket(
-                                packet_num++, false,
-                                GetNthClientInitiatedBidirectionalStreamId(0),
-                                quic::QUIC_STREAM_CANCELLED));
-      }
     }
     // Ping packet to send after migration is completed.
-    if (GetQuicReloadableFlag(quic_advance_ack_timeout_update)) {
       quic_data1.AddWrite(SYNCHRONOUS,
                           client_maker_.MakePingPacket(packet_num++, false));
 
-    } else {
-      quic_data1.AddWrite(SYNCHRONOUS, client_maker_.MakeAckAndPingPacket(
-                                           packet_num++, false, 1, 1, 1));
-    }
   } else {
     if (version_.UsesTls()) {
       if (VersionUsesHttp3(version_.transport_version)) {
