@@ -465,3 +465,10 @@ QUIC_FLAG(bool, FLAGS_quic_reloadable_flag_quic_dont_pad_chlo, false)
 // If true, include MinPlaintextPacketSize when determine whether removing soft
 // limit for crypto frames.
 QUIC_FLAG(bool, FLAGS_quic_reloadable_flag_quic_fix_min_crypto_frame_size, true)
+
+// When true, QuicDispatcher supports decapsulation of Legacy Version
+// Encapsulation packets.
+QUIC_FLAG(
+    bool,
+    FLAGS_quic_reloadable_flag_quic_dispatcher_legacy_version_encapsulation,
+    false)
