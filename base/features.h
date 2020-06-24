@@ -128,6 +128,26 @@ NET_EXPORT extern const base::Feature
 NET_EXPORT extern const base::Feature
     kPartitionExpectCTStateByNetworkIsolationKey;
 
+// Enables limiting the size of Expect-CT table.
+NET_EXPORT extern const base::Feature kExpectCTPruning;
+
+// FeatureParams associated with kExpectCTPruning.
+
+// Expect-CT pruning runs when this many entries are hit.
+NET_EXPORT extern const base::FeatureParam<int> kExpectCTPruneMax;
+// The Expect-CT pruning logic attempts to reduce entries to at most this many.
+NET_EXPORT extern const base::FeatureParam<int> kExpectCTPruneMin;
+// Non-transient entries with |enforce| set are safe from being pruned if
+// they're less than this many days old, unless the number of entries exceeds
+// |kExpectCTMaxEntriesPerNik|.
+NET_EXPORT extern const base::FeatureParam<int> kExpectCTSafeFromPruneDays;
+// If, after pruning transient, non-enforced, old Expect-CT entries,
+// kExpectCTPruneMin is still exceeded, then all NetworkIsolationKeys will be
+// capped to this many entries, based on last observation date.
+NET_EXPORT extern const base::FeatureParam<int> kExpectCTMaxEntriesPerNik;
+// Minimum delay between successive prunings of Expect-CT entries, in seconds.
+NET_EXPORT extern const base::FeatureParam<int> kExpectCTPruneDelaySecs;
+
 // Enables sending TLS 1.3 Key Update messages on TLS 1.3 connections in order
 // to ensure that this corner of the spec is exercised. This is currently
 // disabled by default because we discovered incompatibilities with some
