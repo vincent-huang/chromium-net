@@ -20,6 +20,7 @@
 #include "net/url_request/url_request_test_util.h"
 #include "testing/gmock/include/gmock/gmock.h"
 #include "testing/gtest/include/gtest/gtest.h"
+#include "url/url_util.h"
 
 using net::test::IsError;
 using net::test::IsOk;
@@ -716,7 +717,9 @@ TEST(URLRequestJobComputeReferrer, DoesntTruncateReferrerWithLongRef) {
 
 TEST(URLRequestJobComputeReferrer, InvalidSchemeReferrer) {
   const GURL kOriginalReferrer("about:blank");
-  ASSERT_FALSE(kOriginalReferrer.SchemeIsValidForReferrer());
+  ASSERT_FALSE(url::IsReferrerScheme(
+      kOriginalReferrer.spec().data(),
+      kOriginalReferrer.parsed_for_possibly_invalid_spec().scheme));
 
   EXPECT_EQ(URLRequestJob::ComputeReferrerForPolicy(
                 URLRequest::NEVER_CLEAR_REFERRER, kOriginalReferrer,
