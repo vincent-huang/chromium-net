@@ -21,6 +21,10 @@ namespace features {
 // https://github.com/WICG/lang-client-hint proposes that we deprecate.
 NET_EXPORT extern const base::Feature kAcceptLanguageHeader;
 
+// When kCapReferrerToOriginOnCrossOrigin is enabled, HTTP referrers on cross-
+// origin requests are restricted to contain at most the source origin.
+NET_EXPORT extern const base::Feature kCapReferrerToOriginOnCrossOrigin;
+
 // Enables TLS 1.3 early data.
 NET_EXPORT extern const base::Feature kEnableTLS13EarlyData;
 

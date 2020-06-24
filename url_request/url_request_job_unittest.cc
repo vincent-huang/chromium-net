@@ -7,6 +7,8 @@
 #include <memory>
 
 #include "base/run_loop.h"
+#include "base/test/scoped_feature_list.h"
+#include "net/base/features.h"
 #include "net/base/request_priority.h"
 #include "net/http/http_transaction_test_util.h"
 #include "net/test/cert_test_util.h"
@@ -656,6 +658,116 @@ TEST(URLRequestJobComputeReferrer, AcceptsNullptrInput) {
   // Shouldn't segfault.
   URLRequestJob::ComputeReferrerForPolicy(URLRequest::ReferrerPolicy(), GURL(),
                                           GURL(), nullptr);
+}
+
+TEST(URLRequestJobComputeReferrer, FilesystemDestination) {
+  EXPECT_EQ(
+      URLRequestJob::ComputeReferrerForPolicy(
+          URLRequest::NEVER_CLEAR_REFERRER, GURL("https://referrer.example"),
+          GURL("filesystem:https://destination.example"), nullptr),
+      GURL("https://referrer.example"));
+}
+
+TEST(URLRequestJobComputeReferrer, TruncatesLongReferrer) {
+  std::string original_spec = "https://referrer.example/";
+  original_spec.resize(4097, 'a');
+  const GURL kOriginalReferrer(original_spec);
+
+  EXPECT_EQ(URLRequestJob::ComputeReferrerForPolicy(
+                URLRequest::NEVER_CLEAR_REFERRER, kOriginalReferrer,
+                GURL("https://google.com")),
+            GURL("https://referrer.example/"));
+}
+
+TEST(URLRequestJobComputeReferrer, DoesntTruncateShortReferrer) {
+  std::string original_spec = "https://referrer.example/";
+  original_spec.resize(4096, 'a');
+  const GURL kOriginalReferrer(original_spec);
+
+  EXPECT_EQ(URLRequestJob::ComputeReferrerForPolicy(
+                URLRequest::NEVER_CLEAR_REFERRER, kOriginalReferrer,
+                GURL("https://google.com")),
+            kOriginalReferrer);
+}
+
+TEST(URLRequestJobComputeReferrer, DoesntTruncateEvenShorterReferrer) {
+  std::string original_spec = "https://referrer.example/";
+  original_spec.resize(4095, 'a');
+  const GURL kOriginalReferrer(original_spec);
+
+  EXPECT_EQ(URLRequestJob::ComputeReferrerForPolicy(
+                URLRequest::NEVER_CLEAR_REFERRER, kOriginalReferrer,
+                GURL("https://google.com")),
+            kOriginalReferrer);
+}
+
+TEST(URLRequestJobComputeReferrer, DoesntTruncateReferrerWithLongRef) {
+  // Because the "is the length greater than 4096?" check comes *after*
+  // stripping the ref in the Referrer Policy spec, a URL that is short except
+  // for having a very long ref should not be stripped to an origin by the "if
+  // the length is too long, strip to the origin" check.
+  EXPECT_EQ(URLRequestJob::ComputeReferrerForPolicy(
+                URLRequest::NEVER_CLEAR_REFERRER,
+                GURL(std::string("https://referrer.example/path#") +
+                     std::string(5000, 'a')),
+                GURL("https://google.com")),
+            GURL("https://referrer.example/path"));
+}
+
+TEST(URLRequestJobComputeReferrer, InvalidSchemeReferrer) {
+  const GURL kOriginalReferrer("about:blank");
+  ASSERT_FALSE(kOriginalReferrer.SchemeIsValidForReferrer());
+
+  EXPECT_EQ(URLRequestJob::ComputeReferrerForPolicy(
+                URLRequest::NEVER_CLEAR_REFERRER, kOriginalReferrer,
+                GURL("https://google.com")),
+            GURL());
+
+  EXPECT_EQ(
+      URLRequestJob::ComputeReferrerForPolicy(
+          URLRequest::ORIGIN, kOriginalReferrer, GURL("https://google.com")),
+      GURL());
+}
+
+TEST(URLRequestJobComputeReferrer, CapReferrerOnCrossOrigin) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kCapReferrerToOriginOnCrossOrigin);
+
+  const GURL kOriginalReferrer("https://boggle.com/path");
+
+  EXPECT_EQ(URLRequestJob::ComputeReferrerForPolicy(
+                URLRequest::NEVER_CLEAR_REFERRER, kOriginalReferrer,
+                GURL("https://google.com")),
+            GURL("https://boggle.com/"));
+}
+
+TEST(URLRequestJobComputeReferrer,
+     CapReferrerOnCrossOriginRespectsStricterPolicy) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kCapReferrerToOriginOnCrossOrigin);
+
+  const GURL kOriginalReferrer("https://boggle.com/path");
+
+  EXPECT_EQ(URLRequestJob::ComputeReferrerForPolicy(URLRequest::NO_REFERRER,
+                                                    kOriginalReferrer,
+                                                    GURL("https://google.com")),
+            GURL());
+}
+
+TEST(URLRequestJobComputeReferrer,
+     CapReferrerOnCrossOriginDoesntCapOnSameOrigin) {
+  base::test::ScopedFeatureList feature_list;
+  feature_list.InitAndEnableFeature(
+      features::kCapReferrerToOriginOnCrossOrigin);
+
+  const GURL kOriginalReferrer("https://boggle.com/path");
+
+  EXPECT_EQ(URLRequestJob::ComputeReferrerForPolicy(
+                URLRequest::NEVER_CLEAR_REFERRER, kOriginalReferrer,
+                GURL("https://boggle.com")),
+            kOriginalReferrer);
 }
 
 }  // namespace net
