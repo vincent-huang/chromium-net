@@ -19439,21 +19439,15 @@ class HttpNetworkTransactionReportingTest : public HttpNetworkTransactionTest {
 
 TEST_F(HttpNetworkTransactionReportingTest,
        DontProcessReportToHeaderNoService) {
-  base::HistogramTester histograms;
   clear_reporting_service();
   RequestPolicy();
-  histograms.ExpectBucketCount(
-      ReportingHeaderParser::kHeaderOutcomeHistogram,
-      ReportingHeaderParser::HeaderOutcome::DISCARDED_NO_REPORTING_SERVICE, 1);
+  // No crash.
 }
 
 TEST_F(HttpNetworkTransactionReportingTest, DontProcessReportToHeaderHttp) {
-  base::HistogramTester histograms;
   url_ = "http://www.example.org/";
   RequestPolicy();
-  histograms.ExpectBucketCount(
-      ReportingHeaderParser::kHeaderOutcomeHistogram,
-      ReportingHeaderParser::HeaderOutcome::DISCARDED_INVALID_SSL_INFO, 1);
+  EXPECT_EQ(0u, reporting_context()->cache()->GetEndpointCount());
 }
 
 TEST_F(HttpNetworkTransactionReportingTest, ProcessReportToHeaderHttps) {
@@ -19470,12 +19464,9 @@ TEST_F(HttpNetworkTransactionReportingTest, ProcessReportToHeaderHttps) {
 
 TEST_F(HttpNetworkTransactionReportingTest,
        DontProcessReportToHeaderInvalidHttps) {
-  base::HistogramTester histograms;
   CertStatus cert_status = CERT_STATUS_COMMON_NAME_INVALID;
   RequestPolicy(cert_status);
-  histograms.ExpectBucketCount(
-      ReportingHeaderParser::kHeaderOutcomeHistogram,
-      ReportingHeaderParser::HeaderOutcome::DISCARDED_CERT_STATUS_ERROR, 1);
+  EXPECT_EQ(0u, reporting_context()->cache()->GetEndpointCount());
 }
 #endif  // BUILDFLAG(ENABLE_REPORTING)
 

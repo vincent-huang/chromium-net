@@ -1312,21 +1312,15 @@ void HttpNetworkTransaction::ProcessReportToHeader() {
     return;
 
   ReportingService* service = session_->reporting_service();
-  if (!service) {
-    ReportingHeaderParser::RecordHeaderDiscardedForNoReportingService();
+  if (!service)
     return;
-  }
 
   // Only accept Report-To headers on HTTPS connections that have no
   // certificate errors.
-  if (!response_.ssl_info.is_valid()) {
-    ReportingHeaderParser::RecordHeaderDiscardedForInvalidSSLInfo();
+  if (!response_.ssl_info.is_valid())
     return;
-  }
-  if (IsCertStatusError(response_.ssl_info.cert_status)) {
-    ReportingHeaderParser::RecordHeaderDiscardedForCertStatusError();
+  if (IsCertStatusError(response_.ssl_info.cert_status))
     return;
-  }
 
   service->ProcessHeader(url_.GetOrigin(), value);
 }
