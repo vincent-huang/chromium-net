@@ -19585,25 +19585,17 @@ class HttpNetworkTransactionNetworkErrorLoggingTest
 
 TEST_F(HttpNetworkTransactionNetworkErrorLoggingTest,
        DontProcessNelHeaderNoService) {
-  base::HistogramTester histograms;
   clear_network_error_logging_service();
   RequestPolicy();
-  histograms.ExpectBucketCount(
-      NetworkErrorLoggingService::kHeaderOutcomeHistogram,
-      NetworkErrorLoggingService::HeaderOutcome::
-          DISCARDED_NO_NETWORK_ERROR_LOGGING_SERVICE,
-      1);
+  // No crash.
 }
 
 TEST_F(HttpNetworkTransactionNetworkErrorLoggingTest,
        DontProcessNelHeaderHttp) {
-  base::HistogramTester histograms;
   url_ = "http://www.example.org/";
   request_.url = GURL(url_);
   RequestPolicy();
-  histograms.ExpectBucketCount(
-      NetworkErrorLoggingService::kHeaderOutcomeHistogram,
-      NetworkErrorLoggingService::HeaderOutcome::DISCARDED_INVALID_SSL_INFO, 1);
+  EXPECT_EQ(0u, network_error_logging_service()->headers().size());
 }
 
 // Don't set NEL policies received on a proxied connection.
@@ -19682,13 +19674,9 @@ TEST_F(HttpNetworkTransactionNetworkErrorLoggingTest, ProcessNelHeaderHttps) {
 
 TEST_F(HttpNetworkTransactionNetworkErrorLoggingTest,
        DontProcessNelHeaderInvalidHttps) {
-  base::HistogramTester histograms;
   CertStatus cert_status = CERT_STATUS_COMMON_NAME_INVALID;
   RequestPolicy(cert_status);
-  histograms.ExpectBucketCount(
-      NetworkErrorLoggingService::kHeaderOutcomeHistogram,
-      NetworkErrorLoggingService::HeaderOutcome::DISCARDED_CERT_STATUS_ERROR,
-      1);
+  EXPECT_EQ(0u, network_error_logging_service()->headers().size());
 }
 
 TEST_F(HttpNetworkTransactionNetworkErrorLoggingTest, CreateReportSuccess) {
