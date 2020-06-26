@@ -10822,18 +10822,10 @@ TEST_P(QuicStreamFactoryTest, ReducePingTimeoutOnConnectionTimeOutOpenStreams) {
 
 // Verifies that the QUIC stream factory is initialized correctly.
 TEST_P(QuicStreamFactoryTest, MaybeInitialize) {
-  if (version_.UsesTls() && version_.HasIetfQuicFrames()) {
-    // 0-rtt is not supported in IETF QUIC yet.
-    return;
-  }
   VerifyInitialization(false /* vary_network_isolation_key */);
 }
 
 TEST_P(QuicStreamFactoryTest, MaybeInitializeWithNetworkIsolationKey) {
-  if (version_.UsesTls() && version_.HasIetfQuicFrames()) {
-    // 0-rtt is not supported in IETF QUIC yet.
-    return;
-  }
   base::test::ScopedFeatureList feature_list;
   feature_list.InitWithFeatures(
       // enabled_features
@@ -11061,10 +11053,6 @@ TEST_P(QuicStreamFactoryTest, CryptoConfigCacheMRUWithNetworkIsolationKey) {
 // around, so evictions happen immediately.
 TEST_P(QuicStreamFactoryTest,
        CryptoConfigCacheMRUWithRealRequestsAndWithNetworkIsolationKey) {
-  if (version_.UsesTls() && version_.HasIetfQuicFrames()) {
-    // 0-rtt is not supported in IETF QUIC yet.
-    return;
-  }
   const int kNumSessionsToMake = kMaxRecentCryptoConfigs + 5;
 
   base::test::ScopedFeatureList feature_list;
