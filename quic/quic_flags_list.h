@@ -446,3 +446,10 @@ QUIC_FLAG(
     bool,
     FLAGS_quic_reloadable_flag_quic_do_not_close_stream_again_on_connection_close,
     false)
+
+// If true, determine a serialized packet's fate before the packet gets
+// serialized.
+QUIC_FLAG(
+    bool,
+    FLAGS_quic_reloadable_flag_quic_determine_serialized_packet_fate_early,
+    false)
