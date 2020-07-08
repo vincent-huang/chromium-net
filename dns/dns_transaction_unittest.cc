@@ -621,8 +621,9 @@ class DnsTransactionTestBase : public testing::Test {
     session_ = new DnsSession(
         config_,
         DnsSocketPool::CreateNull(socket_factory_.get(),
-                                  base::Bind(base::RandInt)),
-        base::Bind(&DnsTransactionTestBase::GetNextId, base::Unretained(this)),
+                                  base::BindRepeating(base::RandInt)),
+        base::BindRepeating(&DnsTransactionTestBase::GetNextId,
+                            base::Unretained(this)),
         nullptr /* NetLog */);
     resolve_context_->InvalidateCachesAndPerSessionData(
         session_.get(), false /* network_change */);
