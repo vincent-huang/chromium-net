@@ -28,7 +28,7 @@
 #include "net/base/port_util.h"
 #include "net/base/upload_bytes_element_reader.h"
 #include "net/base/url_util.h"
-#include "net/cookies/cookie_inclusion_status.h"
+#include "net/cookies/cookie_access_result.h"
 #include "net/cookies/cookie_util.h"
 #include "net/dns/dns_config.h"
 #include "net/dns/dns_query.h"
@@ -2189,8 +2189,8 @@ class CookieCallback {
   CookieCallback()
       : result_(false), loop_to_quit_(std::make_unique<base::RunLoop>()) {}
 
-  void SetCookieCallback(CookieInclusionStatus result) {
-    result_ = result.IsInclude();
+  void SetCookieCallback(CookieAccessResult result) {
+    result_ = result.status.IsInclude();
     loop_to_quit_->Quit();
   }
 
