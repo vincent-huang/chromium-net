@@ -230,6 +230,13 @@ enum HandshakeState {
   NUM_HANDSHAKE_STATES = 4
 };
 
+enum class ZeroRttState {
+  kAttemptedAndSucceeded = 0,
+  kAttemptedAndRejected = 1,
+  kNotAttempted = 2,
+  kMaxValue = kNotAttempted,
+};
+
 void RecordHandshakeState(HandshakeState state) {
   UMA_HISTOGRAM_ENUMERATION("Net.QuicHandshakeState", state,
                             NUM_HANDSHAKE_STATES);
@@ -847,7 +854,8 @@ QuicChromiumClientSession::QuicChromiumClientSession(
       ignore_read_error_(false),
       headers_include_h2_stream_dependency_(
           headers_include_h2_stream_dependency),
-      max_allowed_push_id_(max_allowed_push_id) {
+      max_allowed_push_id_(max_allowed_push_id),
+      attempted_zero_rtt_(false) {
   // Make sure connection migration and goaway on path degrading are not turned
   // on at the same time.
   DCHECK(!(migrate_session_early_v2_ && go_away_on_path_degrading_));
@@ -1594,7 +1602,10 @@ void QuicChromiumClientSession::SetDefaultEncryptionLevel(
   }
   if (level == quic::ENCRYPTION_FORWARD_SECURE) {
     OnCryptoHandshakeComplete();
+    LogZeroRttStats();
   }
+  if (level == quic::ENCRYPTION_ZERO_RTT)
+    attempted_zero_rtt_ = true;
   quic::QuicSpdySession::SetDefaultEncryptionLevel(level);
 }
 
@@ -1607,7 +1618,33 @@ void QuicChromiumClientSession::OnOneRttKeysAvailable() {
     std::move(callback_).Run(OK);
   }
   OnCryptoHandshakeComplete();
+  LogZeroRttStats();
   quic::QuicSpdySession::OnOneRttKeysAvailable();
+}
+
+void QuicChromiumClientSession::OnNewEncryptionKeyAvailable(
+    quic::EncryptionLevel level,
+    std::unique_ptr<quic::QuicEncrypter> encrypter) {
+  if (level == quic::ENCRYPTION_ZERO_RTT)
+    attempted_zero_rtt_ = true;
+  QuicSpdySession::OnNewEncryptionKeyAvailable(level, std::move(encrypter));
+}
+
+void QuicChromiumClientSession::LogZeroRttStats() {
+  DCHECK(OneRttKeysAvailable());
+
+  ZeroRttState state;
+
+  if (attempted_zero_rtt_) {
+    if (crypto_stream_->EarlyDataAccepted()) {
+      state = ZeroRttState::kAttemptedAndSucceeded;
+    } else {
+      state = ZeroRttState::kAttemptedAndRejected;
+    }
+  } else {
+    state = ZeroRttState::kNotAttempted;
+  }
+  UMA_HISTOGRAM_ENUMERATION("Net.QuicSession.ZeroRttState", state);
 }
 
 void QuicChromiumClientSession::OnCryptoHandshakeMessageSent(
