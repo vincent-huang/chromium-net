@@ -517,7 +517,6 @@ class NET_EXPORT_PRIVATE QuicChromiumClientSession
       const spdy::SpdyStreamPrecedence& new_precedence) override;
 
   // quic::QuicSession methods:
-  void OnStreamFrame(const quic::QuicStreamFrame& frame) override;
   QuicChromiumClientStream* CreateOutgoingBidirectionalStream() override;
   QuicChromiumClientStream* CreateOutgoingUnidirectionalStream() override;
   const quic::QuicCryptoClientStream* GetCryptoStream() const override;
@@ -532,7 +531,6 @@ class NET_EXPORT_PRIVATE QuicChromiumClientSession
   void OnCryptoHandshakeMessageReceived(
       const quic::CryptoHandshakeMessage& message) override;
   void OnGoAway(const quic::QuicGoAwayFrame& frame) override;
-  void OnRstStream(const quic::QuicRstStreamFrame& frame) override;
   void OnCanCreateNewOutgoingStream(bool unidirectional) override;
   bool ValidateStatelessReset(
       const quic::QuicSocketAddress& self_address,

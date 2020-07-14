@@ -1084,16 +1084,6 @@ void QuicChromiumClientSession::UpdateStreamPriority(
   quic::QuicSpdySession::UpdateStreamPriority(id, new_precedence);
 }
 
-void QuicChromiumClientSession::OnStreamFrame(
-    const quic::QuicStreamFrame& frame) {
-  // Record total number of stream frames.
-  UMA_HISTOGRAM_COUNTS_1M("Net.QuicNumStreamFramesInPacket", 1);
-
-  // Record number of frames per stream in packet.
-  UMA_HISTOGRAM_COUNTS_1M("Net.QuicNumStreamFramesPerStreamInPacket", 1);
-
-  return quic::QuicSpdySession::OnStreamFrame(frame);
-}
 
 void QuicChromiumClientSession::AddHandle(Handle* handle) {
   if (going_away_) {
@@ -1670,11 +1660,6 @@ void QuicChromiumClientSession::OnGoAway(const quic::QuicGoAwayFrame& frame) {
   NotifyFactoryOfSessionGoingAway();
   port_migration_detected_ =
       frame.error_code == quic::QUIC_ERROR_MIGRATING_PORT;
-}
-
-void QuicChromiumClientSession::OnRstStream(
-    const quic::QuicRstStreamFrame& frame) {
-  quic::QuicSession::OnRstStream(frame);
 }
 
 void QuicChromiumClientSession::OnConnectionClosed(
