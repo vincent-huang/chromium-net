@@ -211,7 +211,8 @@ std::unique_ptr<HttpResponse> HandleFileRequest(
 
   base::FilePath::StringPieceType mock_headers_extension;
 #if defined(OS_WIN)
-  mock_headers_extension = base::ASCIIToWide(kMockHttpHeadersExtension);
+  base::string16 temp = base::ASCIIToUTF16(kMockHttpHeadersExtension);
+  mock_headers_extension = temp;
 #else
   mock_headers_extension = kMockHttpHeadersExtension;
 #endif

@@ -39,14 +39,14 @@ struct GenerateFilenameCase {
 // std::u16string.
 std::wstring FilePathAsWString(const base::FilePath& path) {
 #if defined(OS_WIN)
-  return path.value();
+  return base::UTF16ToWide(path.value());
 #elif defined(OS_POSIX) || defined(OS_FUCHSIA)
   return base::UTF8ToWide(path.value());
 #endif
 }
 base::FilePath WStringAsFilePath(const std::wstring& str) {
 #if defined(OS_WIN)
-  return base::FilePath(str);
+  return base::FilePath(base::WideToUTF16(str));
 #elif defined(OS_POSIX) || defined(OS_FUCHSIA)
   return base::FilePath(base::WideToUTF8(str));
 #endif

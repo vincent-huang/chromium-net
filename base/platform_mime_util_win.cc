@@ -20,9 +20,9 @@ bool PlatformMimeUtil::GetPlatformMimeTypeFromExtension(
   // names are not case-sensitive).
   base::FilePath::StringType value, key = FILE_PATH_LITERAL(".") + ext;
   base::win::RegKey(HKEY_CLASSES_ROOT, key.c_str(), KEY_READ)
-      .ReadValue(L"Content Type", &value);
+      .ReadValue(STRING16_LITERAL("Content Type"), &value);
   if (!value.empty()) {
-    *result = base::WideToUTF8(value);
+    *result = base::UTF16ToUTF8(value);
     return true;
   }
   return false;
@@ -32,9 +32,10 @@ bool PlatformMimeUtil::GetPlatformPreferredExtensionForMimeType(
     const std::string& mime_type,
     base::FilePath::StringType* ext) const {
   base::FilePath::StringType key =
-      L"MIME\\Database\\Content Type\\" + base::UTF8ToWide(mime_type);
+      STRING16_LITERAL("MIME\\Database\\Content Type\\") +
+      base::UTF8ToUTF16(mime_type);
   if (base::win::RegKey(HKEY_CLASSES_ROOT, key.c_str(), KEY_READ)
-          .ReadValue(L"Extension", ext) != ERROR_SUCCESS) {
+          .ReadValue(STRING16_LITERAL("Extension"), ext) != ERROR_SUCCESS) {
     return false;
   }
   // Strip off the leading dot, this should always be the case.
