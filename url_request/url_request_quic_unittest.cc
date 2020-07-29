@@ -578,7 +578,7 @@ TEST_P(URLRequestQuicTest, CancelPushIfCached_AllCached) {
   EXPECT_FALSE(end_entry_2->HasParams());
   EXPECT_FALSE(GetOptionalNetErrorCodeFromParams(*end_entry_2));
 
-#if !defined(OS_FUCHSIA) && !defined(OS_IOS) && !defined(OS_MACOSX)
+#if !defined(OS_FUCHSIA) && !defined(OS_APPLE)
   // TODO(crbug.com/813631): Make this work on Fuchsia.
   // TODO(crbug.com/1032568): Make this work on iOS.
   // TODO(crbug.com/1087378): Flaky on Mac.
