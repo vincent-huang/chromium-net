@@ -197,6 +197,11 @@ void HttpssvcMetrics::RecordIntegrityCommonMetrics() {
                        non_integrity_resolve_times_.end());
   DCHECK(slowest_non_integrity_resolve != non_integrity_resolve_times_.end());
 
+  // It's possible to get here with a zero resolve time in tests.  Avoid
+  // divide-by-zero below by returning early; this data point is invalid anyway.
+  if (slowest_non_integrity_resolve->is_zero())
+    return;
+
   // Compute a percentage showing how much larger the INTEGRITY resolve time was
   // compared to the slowest A or AAAA query.
   //
