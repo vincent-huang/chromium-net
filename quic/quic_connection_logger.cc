@@ -430,8 +430,10 @@ void QuicConnectionLogger::OnGoAwayFrame(const quic::QuicGoAwayFrame& frame) {
   event_logger_.OnGoAwayFrame(frame);
 }
 
-void QuicConnectionLogger::OnPingFrame(const quic::QuicPingFrame& frame) {
-  event_logger_.OnPingFrame(frame);
+void QuicConnectionLogger::OnPingFrame(
+    const quic::QuicPingFrame& frame,
+    quic::QuicTime::Delta ping_received_delay) {
+  event_logger_.OnPingFrame(frame, ping_received_delay);
 }
 
 void QuicConnectionLogger::OnPaddingFrame(const quic::QuicPaddingFrame& frame) {

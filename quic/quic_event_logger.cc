@@ -691,7 +691,9 @@ void QuicEventLogger::OnGoAwayFrame(const quic::QuicGoAwayFrame& frame) {
                     [&] { return NetLogQuicGoAwayFrameParams(&frame); });
 }
 
-void QuicEventLogger::OnPingFrame(const quic::QuicPingFrame& frame) {
+void QuicEventLogger::OnPingFrame(
+    const quic::QuicPingFrame& frame,
+    quic::QuicTime::Delta /*ping_received_delay*/) {
   // PingFrame has no contents to log, so just record that it was received.
   if (!net_log_.IsCapturing())
     return;
