@@ -113,6 +113,8 @@ class NET_EXPORT_PRIVATE QuicConnectionLogger
       const quic::TransportParameters& transport_parameters) override;
   void OnTransportParametersReceived(
       const quic::TransportParameters& transport_parameters) override;
+  void OnTransportParametersResumed(
+      const quic::TransportParameters& transport_parameters) override;
 
   void OnCryptoHandshakeMessageReceived(
       const quic::CryptoHandshakeMessage& message);

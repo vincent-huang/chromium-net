@@ -858,4 +858,14 @@ void QuicEventLogger::OnTransportParametersReceived(
       });
 }
 
+void QuicEventLogger::OnTransportParametersResumed(
+    const quic::TransportParameters& transport_parameters) {
+  if (!net_log_.IsCapturing())
+    return;
+  net_log_.AddEvent(
+      NetLogEventType::QUIC_SESSION_TRANSPORT_PARAMETERS_RESUMED, [&] {
+        return NetLogQuicTransportParametersParams(transport_parameters);
+      });
+}
+
 }  // namespace net
