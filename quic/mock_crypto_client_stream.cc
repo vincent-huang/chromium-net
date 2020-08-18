@@ -154,6 +154,17 @@ bool MockCryptoClientStream::CryptoConnect() {
       break;
     }
 
+    case ASYNC_ZERO_RTT: {
+      DCHECK(session()->version().UsesTls());
+      handshake_confirmed_ = false;
+      FillCryptoParams();
+      if (proof_verify_details_) {
+        reinterpret_cast<QuicSpdyClientSessionBase*>(session())
+            ->OnProofVerifyDetailsAvailable(*proof_verify_details_);
+      }
+      break;
+    }
+
     case CONFIRM_HANDSHAKE: {
       encryption_established_ = true;
       handshake_confirmed_ = true;
@@ -244,6 +255,23 @@ CryptoMessageParser* MockCryptoClientStream::crypto_message_parser() {
 // state.  Intercept and ignore OnOneRttPacketAcknowledged() calls to prevent
 // DCHECKs within the handshaker from failing.
 void MockCryptoClientStream::OnOneRttPacketAcknowledged() {}
+
+void MockCryptoClientStream::NotifySessionZeroRttComplete() {
+  DCHECK(session()->version().UsesTls());
+  encryption_established_ = true;
+  handshake_confirmed_ = false;
+  session()->connection()->InstallDecrypter(
+      ENCRYPTION_ZERO_RTT,
+      std::make_unique<NullDecrypter>(Perspective::IS_CLIENT));
+  if (session()->version().UsesHttp3()) {
+    SetConfigNegotiated();
+  }
+  session()->OnNewEncryptionKeyAvailable(
+      ENCRYPTION_ZERO_RTT,
+      std::make_unique<NullEncrypter>(Perspective::IS_CLIENT));
+
+  session()->DiscardOldEncryptionKey(ENCRYPTION_INITIAL);
+}
 
 void MockCryptoClientStream::NotifySessionOneRttKeyAvailable() {
   encryption_established_ = true;
