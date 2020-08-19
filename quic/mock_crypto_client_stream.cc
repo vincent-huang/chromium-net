@@ -203,7 +203,7 @@ bool MockCryptoClientStream::CryptoConnect() {
           ENCRYPTION_FORWARD_SECURE,
           std::make_unique<NullEncrypter>(Perspective::IS_CLIENT));
       if (session()->version().UsesTls()) {
-        session()->OnOneRttKeysAvailable();
+        session()->OnTlsHandshakeComplete();
       } else {
         session()->SetDefaultEncryptionLevel(ENCRYPTION_FORWARD_SECURE);
       }
@@ -308,7 +308,7 @@ void MockCryptoClientStream::NotifySessionOneRttKeyAvailable() {
   }
   if (session()->version().UsesTls()) {
     SetConfigNegotiated();
-    session()->OnOneRttKeysAvailable();
+    session()->OnTlsHandshakeComplete();
   } else {
     session()->SetDefaultEncryptionLevel(ENCRYPTION_FORWARD_SECURE);
   }

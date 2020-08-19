@@ -1599,7 +1599,7 @@ void QuicChromiumClientSession::SetDefaultEncryptionLevel(
   quic::QuicSpdySession::SetDefaultEncryptionLevel(level);
 }
 
-void QuicChromiumClientSession::OnOneRttKeysAvailable() {
+void QuicChromiumClientSession::OnTlsHandshakeComplete() {
   if (!callback_.is_null()) {
     // Currently for all CryptoHandshakeEvent events, callback_
     // could be called because there are no error events in CryptoHandshakeEvent
@@ -1610,7 +1610,7 @@ void QuicChromiumClientSession::OnOneRttKeysAvailable() {
 
   OnCryptoHandshakeComplete();
   LogZeroRttStats();
-  quic::QuicSpdySession::OnOneRttKeysAvailable();
+  quic::QuicSpdySession::OnTlsHandshakeComplete();
 }
 
 void QuicChromiumClientSession::OnNewEncryptionKeyAvailable(
