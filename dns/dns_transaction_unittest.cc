@@ -638,8 +638,8 @@ class DnsTransactionTestBase : public testing::Test {
     socket_factory_.reset(new TestSocketFactory());
     session_ = new DnsSession(
         config_,
-        DnsSocketPool::CreateNull(socket_factory_.get(),
-                                  base::BindRepeating(base::RandInt)),
+        std::make_unique<DnsSocketPool>(
+            socket_factory_.get(), config_.nameservers, nullptr /* net_log */),
         base::BindRepeating(&DnsTransactionTestBase::GetNextId,
                             base::Unretained(this)),
         nullptr /* NetLog */);

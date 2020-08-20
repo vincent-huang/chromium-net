@@ -38,6 +38,8 @@ class NET_EXPORT_PRIVATE DnsSession : public base::RefCounted<DnsSession> {
  public:
   typedef base::RepeatingCallback<int()> RandCallback;
 
+  // TODO(crbug.com/1116579): Remove this unnecessary abstraction now that DNS
+  // sockets are not pooled and do not need a special release signal.
   class NET_EXPORT_PRIVATE SocketLease {
    public:
     SocketLease(scoped_refptr<DnsSession> session,
@@ -71,11 +73,13 @@ class NET_EXPORT_PRIVATE DnsSession : public base::RefCounted<DnsSession> {
 
   // Allocate a socket, already connected to the server address.
   // When the SocketLease is destroyed, the socket will be freed.
+  // TODO(crbug.com/1116579): Remove this and directly call into DnsSocketPool.
   std::unique_ptr<SocketLease> AllocateSocket(size_t server_index,
                                               const NetLogSource& source);
 
   // Creates a StreamSocket from the factory for a transaction over TCP. These
   // sockets are not pooled.
+  // TODO(crbug.com/1116579): Remove this and directly call into DnsSocketPool.
   std::unique_ptr<StreamSocket> CreateTCPSocket(size_t server_index,
                                                 const NetLogSource& source);
 

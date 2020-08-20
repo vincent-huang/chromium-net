@@ -48,7 +48,6 @@ DnsSession::DnsSession(const DnsConfig& config,
                                          0,
                                          std::numeric_limits<uint16_t>::max())),
       net_log_(net_log) {
-  socket_pool_->Initialize(&config_.nameservers, net_log);
   UMA_HISTOGRAM_CUSTOM_COUNTS("AsyncDNS.ServerCount",
                               config_.nameservers.size(), 1, 10, 11);
 }
@@ -65,7 +64,7 @@ std::unique_ptr<DnsSession::SocketLease> DnsSession::AllocateSocket(
     const NetLogSource& source) {
   std::unique_ptr<DatagramClientSocket> socket;
 
-  socket = socket_pool_->AllocateSocket(server_index);
+  socket = socket_pool_->CreateConnectedUdpSocket(server_index);
   if (!socket.get())
     return std::unique_ptr<SocketLease>();
 
@@ -79,7 +78,7 @@ std::unique_ptr<DnsSession::SocketLease> DnsSession::AllocateSocket(
 std::unique_ptr<StreamSocket> DnsSession::CreateTCPSocket(
     size_t server_index,
     const NetLogSource& source) {
-  return socket_pool_->CreateTCPSocket(server_index, source);
+  return socket_pool_->CreateTcpSocket(server_index, source);
 }
 
 void DnsSession::InvalidateWeakPtrsForTesting() {
@@ -92,8 +91,6 @@ void DnsSession::FreeSocket(size_t server_index,
   DCHECK(socket.get());
 
   socket->NetLog().EndEvent(NetLogEventType::SOCKET_IN_USE);
-
-  socket_pool_->FreeSocket(server_index, std::move(socket));
 }
 
 }  // namespace net
