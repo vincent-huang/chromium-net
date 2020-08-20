@@ -246,10 +246,7 @@ class DnsClientImpl : public DnsClient {
       DCHECK(new_effective_config.value().IsValid());
 
       std::unique_ptr<DnsSocketPool> socket_pool(
-          new_effective_config.value().randomize_ports
-              ? DnsSocketPool::CreateDefault(socket_factory_,
-                                             rand_int_callback_)
-              : DnsSocketPool::CreateNull(socket_factory_, rand_int_callback_));
+          DnsSocketPool::CreateNull(socket_factory_, rand_int_callback_));
       session_ =
           new DnsSession(std::move(new_effective_config).value(),
                          std::move(socket_pool), rand_int_callback_, net_log_);
