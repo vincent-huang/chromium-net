@@ -18,6 +18,7 @@
 #include "net/dns/dns_hosts.h"
 #include "net/dns/dns_query.h"
 #include "net/dns/dns_session.h"
+#include "net/dns/dns_socket_pool.h"
 #include "net/dns/dns_util.h"
 #include "net/dns/resolve_context.h"
 #include "testing/gtest/include/gtest/gtest.h"
