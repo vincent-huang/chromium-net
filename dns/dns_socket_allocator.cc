@@ -42,8 +42,10 @@ DnsSocketAllocator::DnsSocketAllocator(ClientSocketFactory* socket_factory,
 DnsSocketAllocator::~DnsSocketAllocator() = default;
 
 std::unique_ptr<DatagramClientSocket>
-DnsSocketAllocator::CreateConnectedUdpSocket(size_t server_index) {
+DnsSocketAllocator::CreateConnectedUdpSocket(size_t server_index,
+                                             int* out_connection_error) {
   DCHECK_LT(server_index, nameservers_.size());
+  DCHECK(out_connection_error);
 
   std::unique_ptr<DatagramClientSocket> socket;
 
@@ -52,9 +54,9 @@ DnsSocketAllocator::CreateConnectedUdpSocket(size_t server_index) {
                                                        no_source);
   DCHECK(socket);
 
-  int rv = socket->Connect(nameservers_[server_index]);
-  if (rv != OK) {
-    DVLOG(1) << "Failed to connect socket: " << rv;
+  *out_connection_error = socket->Connect(nameservers_[server_index]);
+  if (*out_connection_error != OK) {
+    DVLOG(1) << "Failed to connect socket: " << *out_connection_error;
     socket.reset();
   }
 

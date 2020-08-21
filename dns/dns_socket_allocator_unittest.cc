@@ -37,10 +37,13 @@ TEST_F(DnsSocketAllocatorTest, CreateConnectedUdpSocket) {
   StaticSocketDataProvider data_provider;
   socket_factory_.AddSocketDataProvider(&data_provider);
 
+  int connection_error = ERR_FAILED;
   std::unique_ptr<DatagramClientSocket> socket =
-      allocator_->CreateConnectedUdpSocket(1 /* server_index */);
+      allocator_->CreateConnectedUdpSocket(1 /* server_index */,
+                                           &connection_error);
 
   ASSERT_TRUE(socket);
+  EXPECT_THAT(connection_error, test::IsOk());
 
   IPEndPoint peer_address;
   ASSERT_THAT(socket->GetPeerAddress(&peer_address), test::IsOk());
@@ -55,10 +58,13 @@ TEST_F(DnsSocketAllocatorTest, CreateConnectedUdpSocket_ConnectError) {
   data_provider.set_connect_data(connect_data);
   socket_factory_.AddSocketDataProvider(&data_provider);
 
+  int connection_error = OK;
   std::unique_ptr<DatagramClientSocket> socket =
-      allocator_->CreateConnectedUdpSocket(0 /* server_index */);
+      allocator_->CreateConnectedUdpSocket(0 /* server_index */,
+                                           &connection_error);
 
   EXPECT_FALSE(socket);
+  EXPECT_THAT(connection_error, test::IsError(ERR_INSUFFICIENT_RESOURCES));
 }
 
 TEST_F(DnsSocketAllocatorTest, CreateTcpSocket) {

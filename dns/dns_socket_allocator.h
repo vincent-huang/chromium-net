@@ -32,9 +32,11 @@ class NET_EXPORT_PRIVATE DnsSocketAllocator {
   DnsSocketAllocator& operator=(const DnsSocketAllocator&) = delete;
 
   // Creates a UDP client socket that is already connected to the nameserver
-  // referenced by |server_index|. Returns null on error connecting the socket.
+  // referenced by |server_index| and sets |out_connection_error| to the result
+  // of the connection. On error connecting the socket, returns null.
   std::unique_ptr<DatagramClientSocket> CreateConnectedUdpSocket(
-      size_t server_index);
+      size_t server_index,
+      int* out_connection_error);
 
   // Creates a StreamSocket for TCP to the nameserver referenced by
   // |server_index|. Does not connect the seocket.

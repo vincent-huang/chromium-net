@@ -1255,12 +1255,16 @@ class DnsTransactionImpl : public DnsTransaction,
   AttemptResult MakeUdpAttempt(size_t server_index,
                                std::unique_ptr<DnsQuery> query) {
     DCHECK(!secure_);
+    DCHECK(!session_->udp_tracker()->low_entropy());
     size_t attempt_number = attempts_.size();
 
+    int connection_error = OK;
     std::unique_ptr<DatagramClientSocket> socket =
-        session_->socket_allocator()->CreateConnectedUdpSocket(server_index);
+        session_->socket_allocator()->CreateConnectedUdpSocket(
+            server_index, &connection_error);
 
     bool got_socket = !!socket.get();
+    DCHECK_EQ(got_socket, connection_error == OK);
 
     DnsUDPAttempt* attempt =
         new DnsUDPAttempt(server_index, std::move(socket), std::move(query),
@@ -1269,8 +1273,10 @@ class DnsTransactionImpl : public DnsTransaction,
     attempts_.push_back(base::WrapUnique(attempt));
     ++attempts_count_;
 
-    if (!got_socket)
+    if (!got_socket) {
+      session_->udp_tracker()->RecordConnectionError(connection_error);
       return AttemptResult(ERR_CONNECTION_REFUSED, nullptr);
+    }
 
     net_log_.AddEventReferencingSource(NetLogEventType::DNS_TRANSACTION_ATTEMPT,
                                        attempt->GetSocketNetLog().source());
