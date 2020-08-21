@@ -48,7 +48,7 @@
 #include "net/dns/dns_response.h"
 #include "net/dns/dns_server_iterator.h"
 #include "net/dns/dns_session.h"
-#include "net/dns/dns_socket_pool.h"
+#include "net/dns/dns_socket_allocator.h"
 #include "net/dns/dns_udp_tracker.h"
 #include "net/dns/dns_util.h"
 #include "net/dns/public/dns_over_https_server_config.h"
@@ -1258,7 +1258,7 @@ class DnsTransactionImpl : public DnsTransaction,
     size_t attempt_number = attempts_.size();
 
     std::unique_ptr<DatagramClientSocket> socket =
-        session_->socket_pool()->CreateConnectedUdpSocket(server_index);
+        session_->socket_allocator()->CreateConnectedUdpSocket(server_index);
 
     bool got_socket = !!socket.get();
 
@@ -1338,8 +1338,8 @@ class DnsTransactionImpl : public DnsTransaction,
     DCHECK(!secure_);
 
     std::unique_ptr<StreamSocket> socket(
-        session_->socket_pool()->CreateTcpSocket(server_index,
-                                                 net_log_.source()));
+        session_->socket_allocator()->CreateTcpSocket(server_index,
+                                                      net_log_.source()));
 
     unsigned attempt_number = attempts_.size();
 

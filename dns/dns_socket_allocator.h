@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef NET_DNS_DNS_SOCKET_POOL_H_
-#define NET_DNS_DNS_SOCKET_POOL_H_
+#ifndef NET_DNS_DNS_SOCKET_ALLOCATOR_H_
+#define NET_DNS_DNS_SOCKET_ALLOCATOR_H_
 
 #include <memory>
 #include <vector>
@@ -20,20 +20,16 @@ class NetLog;
 struct NetLogSource;
 class StreamSocket;
 
-// A DnsSocketPool is an abstraction layer around a ClientSocketFactory that
-// allows preallocation, reuse, or other strategies to manage sockets connected
-// to DNS servers.
-//
-// TODO(crbug.com/1116579): Rename since this doesn't do any pooling.
-class NET_EXPORT_PRIVATE DnsSocketPool {
+// Allocation logic for DNS UDP and TCP sockets.
+class NET_EXPORT_PRIVATE DnsSocketAllocator {
  public:
-  DnsSocketPool(ClientSocketFactory* factory,
-                std::vector<IPEndPoint> nameservers,
-                NetLog* net_log);
-  ~DnsSocketPool();
+  DnsSocketAllocator(ClientSocketFactory* factory,
+                     std::vector<IPEndPoint> nameservers,
+                     NetLog* net_log);
+  ~DnsSocketAllocator();
 
-  DnsSocketPool(const DnsSocketPool&) = delete;
-  DnsSocketPool& operator=(const DnsSocketPool&) = delete;
+  DnsSocketAllocator(const DnsSocketAllocator&) = delete;
+  DnsSocketAllocator& operator=(const DnsSocketAllocator&) = delete;
 
   // Creates a UDP client socket that is already connected to the nameserver
   // referenced by |server_index|. Returns null on error connecting the socket.
@@ -51,6 +47,6 @@ class NET_EXPORT_PRIVATE DnsSocketPool {
   const std::vector<IPEndPoint> nameservers_;
 };
 
-} // namespace net
+}  // namespace net
 
-#endif // NET_DNS_DNS_SOCKET_POOL_H_
+#endif  // NET_DNS_DNS_SOCKET_ALLOCATOR_H_

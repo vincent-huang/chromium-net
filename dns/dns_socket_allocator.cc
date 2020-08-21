@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "net/dns/dns_socket_pool.h"
+#include "net/dns/dns_socket_allocator.h"
 
 #include "base/logging.h"
 #include "base/rand_util.h"
@@ -28,21 +28,21 @@ const DatagramSocket::BindType kBindType = DatagramSocket::DEFAULT_BIND;
 const DatagramSocket::BindType kBindType = DatagramSocket::RANDOM_BIND;
 #endif
 
-} // namespace
+}  // namespace
 
-DnsSocketPool::DnsSocketPool(ClientSocketFactory* socket_factory,
-                             std::vector<IPEndPoint> nameservers,
-                             NetLog* net_log)
+DnsSocketAllocator::DnsSocketAllocator(ClientSocketFactory* socket_factory,
+                                       std::vector<IPEndPoint> nameservers,
+                                       NetLog* net_log)
     : socket_factory_(socket_factory),
       net_log_(net_log),
       nameservers_(std::move(nameservers)) {
   DCHECK(socket_factory_);
 }
 
-DnsSocketPool::~DnsSocketPool() = default;
+DnsSocketAllocator::~DnsSocketAllocator() = default;
 
-std::unique_ptr<DatagramClientSocket> DnsSocketPool::CreateConnectedUdpSocket(
-    size_t server_index) {
+std::unique_ptr<DatagramClientSocket>
+DnsSocketAllocator::CreateConnectedUdpSocket(size_t server_index) {
   DCHECK_LT(server_index, nameservers_.size());
 
   std::unique_ptr<DatagramClientSocket> socket;
@@ -61,7 +61,7 @@ std::unique_ptr<DatagramClientSocket> DnsSocketPool::CreateConnectedUdpSocket(
   return socket;
 }
 
-std::unique_ptr<StreamSocket> DnsSocketPool::CreateTcpSocket(
+std::unique_ptr<StreamSocket> DnsSocketAllocator::CreateTcpSocket(
     size_t server_index,
     const NetLogSource& source) {
   DCHECK_LT(server_index, nameservers_.size());
@@ -70,4 +70,4 @@ std::unique_ptr<StreamSocket> DnsSocketPool::CreateTcpSocket(
       AddressList(nameservers_[server_index]), nullptr, net_log_, source);
 }
 
-} // namespace net
+}  // namespace net
