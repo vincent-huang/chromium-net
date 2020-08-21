@@ -65,7 +65,13 @@ bugs](https://bugs.chromium.org/p/chromium/issues/list?sort=pri%20-modified&q=Ne
 * If the bug had the `Needs-Feedback` label for over a week and the
   feedback needed to make progress was not yet provided, archive the bug.
 
-## 3. (Optional) Look through crash reports
+## 3. Ensure P0 and P1 bugs have an owner
+
+Look through [the list of unowned high priority
+bugs](https://bugs.chromium.org/p/chromium/issues/list?sort=pri%20-stars%20-opened&q=Pri%3A0%2C1%20-has%3Aowner%20-label%3ANetwork-Triaged%20component%3DInternals%3ENetwork%2CInternals%3ENetwork%3ECache%2CInternals%3ENetwork%3ESSL%2CInternals%3ENetwork%3EQUIC%2CInternals%3ENetwork%3EAuth%2CInternals%3ENetwork%3EHTTP2%2CInternals%3ENetwork%3EProxy%2CInternals%3ENetwork%3ELibrary%2CInternals%3ENetwork%3ELogging%2CInternals%3ENetwork%3EConnectivity%2CInternals%3ENetwork%3EDomainSecurityPolicy%2CInternals%3ENetwork%3ETrustTokens%2CInternals%3ENetwork%3EFilters%2CInternals%3ENetwork%3EFTP%2CInternals%3ENetwork%3ESDCH).
+These bugs should either have an owner, or be downgraded to a lower priority.
+
+## 4. (Optional) Look through crash reports
 
 Top crashes will already be entered into the bug system by a different process,
 so will be handled by the triage steps above.
@@ -73,7 +79,7 @@ so will be handled by the triage steps above.
 However if you have time to look through lower threshold crashes, see
 [internal: Looking for new crashers](https://goto.google.com/network_triage_internal#looking-for-new-crashers)
 
-## 4. Send out a sheriff report
+## 5. Send out a sheriff report
 
 On the final day of your rotation, send a brief summary to net-dev@chromium.org
 detailing any interesting or concerning trends. Do not discuss any restricted
